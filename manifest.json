@@ -1,0 +1,49 @@
+{
+  "name": "Influence PRO",
+  "short_name": "Influence PRO",
+  "description": "Gestão completa para micro influenciadores. Controle publis, agenda, metas e ganhe com indicações.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07070F",
+  "theme_color": "#07070F",
+  "lang": "pt-BR",
+  "categories": ["business", "productivity", "social"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshot.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Minhas Publis",
+      "short_name": "Publis",
+      "url": "/?tab=publis",
+      "description": "Ver minhas publicações"
+    },
+    {
+      "name": "Agenda",
+      "short_name": "Agenda",
+      "url": "/?tab=calendario",
+      "description": "Ver calendário de postagens"
+    }
+  ]
+}
