@@ -1,0 +1,2219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="theme-color" content="#0D0D14"/>
+  <title>Influence PRO</title>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="apple-mobile-web-app-title" content="Influence PRO"/>
+  <link rel="apple-touch-icon" href="icon-192.png"/>
+  <style>
+    body{margin:0;background:#0D0D14;display:flex;justify-content:center;overscroll-behavior-y:none;overflow-y:hidden;position:fixed;width:100%;height:100%;}
+    #root{width:100%;max-width:430px;min-height:100vh;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+<div id="root">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0D0D14;gap:20px;">
+    <div style="font-family:sans-serif;font-size:32px;font-weight:900;background:linear-gradient(135deg,#7C6AF7,#EC4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">INFLUENCE PRO</div>
+    <div style="width:36px;height:36px;border:3px solid #1E1E30;border-top:3px solid #7C6AF7;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+    <div style="color:#6B6880;font-size:12px;font-family:sans-serif;">Carregando...</div>
+  </div>
+</div>
+
+<!-- React 18 -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+<!-- Firebase Compat (works without module bundler) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+
+<script>
+  // Init Firebase
+  const firebaseConfig = {
+    apiKey:            "AIzaSyD7rv-cygkLUyTZydUV3SLe2GH7DV30_Yc",
+    authDomain:        "influencer-pro-1b9b0.firebaseapp.com",
+    projectId:         "influencer-pro-1b9b0",
+    storageBucket:     "influencer-pro-1b9b0.firebasestorage.app",
+    messagingSenderId: "234691340961",
+    appId:             "1:234691340961:web:0298046c2c50252a0b5ee0",
+    measurementId:     "G-T7V2SLW4E6"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db   = firebase.firestore();
+  const auth = firebase.auth();
+
+  window.FB_DB   = db;
+  window.FB_AUTH = auth;
+
+  // Firebase helpers usando API compat
+  window.fbGet = (col,id) =>
+    db.collection(col).doc(id).get()
+      .then(d => d.exists ? {id:d.id,...d.data()} : null);
+
+  window.fbSet = (col,id,data) =>
+    db.collection(col).doc(id).set({...data, updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+
+  window.fbAdd = (col,data) =>
+    db.collection(col).add({...data, createdAt:firebase.firestore.FieldValue.serverTimestamp()})
+      .then(r => ({id:r.id}));
+
+  window.fbUpdate = (col,id,data) =>
+    db.collection(col).doc(id).update({...data, updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+
+  window.fbDelete = (col,id) =>
+    db.collection(col).doc(id).delete();
+
+  window.fbQuery = (col,field,val) =>
+    db.collection(col).where(field,"==",val).get()
+      .then(s => s.docs.map(d=>({id:d.id,...d.data()})));
+
+  window.fbListen = (col,field,val,cb) =>
+    db.collection(col).where(field,"==",val)
+      .onSnapshot(s => cb(s.docs.map(d=>({id:d.id,...d.data()}))));
+
+  window.fbListenAll = (col,cb) =>
+    db.collection(col).onSnapshot(s => cb(s.docs.map(d=>({id:d.id,...d.data()}))));
+
+  window.fbSignIn  = (e,p) => auth.signInWithEmailAndPassword(e,p);
+  window.fbSignUp  = (e,p) => auth.createUserWithEmailAndPassword(e,p);
+  window.fbSignOut = ()    => auth.signOut();
+  window.fbOnAuth  = (cb)  => auth.onAuthStateChanged(cb);
+
+  window.FB_READY = true;
+  console.log("✅ Firebase Compat conectado!");
+</script>
+
+<!-- Babel for JSX -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel" data-presets="react">
+  const { useState, useEffect, useCallback } = React;
+
+  // Firebase helpers (via window globals)
+  const fsGet       = (c,i)     => window.fbGet(c,i);
+  const fsSet       = (c,i,d)   => window.fbSet(c,i,d);
+  const fsAdd       = (c,d)     => window.fbAdd(c,d);
+  const fsUpdate    = (c,i,d)   => window.fbUpdate(c,i,d);
+  const fsDelete    = (c,i)     => window.fbDelete(c,i);
+  const fsQuery     = (c,f,v)   => window.fbQuery(c,f,v);
+  const fsListen    = (c,f,v,cb)=> window.fbListen(c,f,v,cb);
+  const fsListenAll = (c,cb)    => window.fbListenAll(c,cb);
+
+  // Auth helpers
+  const fbSignIn  = (e,p) => window.fbSignIn(e,p);
+  const fbSignUp  = (e,p) => window.fbSignUp(e,p);
+  const fbSignOut = ()    => window.fbSignOut();
+  const fbOnAuth  = (cb)  => window.fbOnAuth(cb);
+
+
+
+
+/* ─── CONSTANTS ─── */
+const PIX_KEY_OWNER = "06981774950";
+const TYPE_COLOR    = {reels:"#F87171",feed:"#34D399",story:"#FBBF24",campanha:"#A78BFA"};
+const TYPE_LABEL    = {reels:"Reels",feed:"Feed",story:"Story",campanha:"Campanha"};
+const TYPE_EMOJI    = {reels:"🎬",feed:"📸",story:"📱",campanha:"📦"};
+const STATUS_COLOR  = {postado:"#34D399",pendente:"#FBBF24",atrasado:"#F87171"};
+const STATUS_ICON   = {postado:"✓",pendente:"⏳",atrasado:"⚠"};
+const MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+const TIPS = [
+  "💡 Reels têm 3x mais alcance que feed estático. Priorize!",
+  "📊 Responda comentários nas primeiras 2h — o algoritmo adora!",
+  "🎯 Nicho claro: marcas pagam mais por influenciadores nichados.",
+  "⏰ Melhores horários: 18h–21h nos dias úteis.",
+  "🔥 Stories diários aumentam retenção em até 40%.",
+  "💰 Nunca aceite permuta sem valor mínimo. Seu tempo vale!",
+];
+
+function genId()     { return Math.random().toString(36).substr(2,8).toUpperCase(); }
+function genRefId(n) { return n.replace(/\s.*/,"").toUpperCase().substr(0,3)+Math.floor(1000+Math.random()*9000); }
+
+/* ─── THEMES ─── */
+const THEMES = {
+  dark:  { bg:"#0D0D14",surface:"#14141F",border:"#1E1E30",text:"#E8E6F0",sub:"#6B6880",accent:"#7C6AF7",accentSoft:"#7C6AF718",card:"#16162280",navBg:"linear-gradient(180deg,#0D0D14 90%,transparent)",inputBg:"#1E1E30",inputBorder:"#2A2A40" },
+  light: { bg:"#F0EEF9",surface:"#FFFFFF",border:"#E2DFF0",text:"#1A1830",sub:"#8A88A0",accent:"#7C6AF7",accentSoft:"#7C6AF712",card:"#FFFFFFCC",navBg:"linear-gradient(180deg,#F0EEF9 90%,transparent)",inputBg:"#F5F3FF",inputBorder:"#DDD9F0" },
+};
+
+const makeCSS = t => `
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Bebas+Neue&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  ::-webkit-scrollbar{width:0;}
+  html,body{height:100%;overflow:hidden;}
+  #root{height:100vh;overflow:hidden;}
+  .s{transition:transform .14s;cursor:pointer;} .s:active{transform:scale(.96);}
+  .fi{animation:fi .3s ease both;}
+  @keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .fi2{animation:fi .3s .07s ease both;} .fi3{animation:fi .3s .14s ease both;}
+  .pb{transition:width .8s cubic-bezier(.4,0,.2,1);}
+  input,button,select,textarea{outline:none;font-family:'Plus Jakarta Sans',sans-serif;}
+  input::placeholder,textarea::placeholder{color:${t.sub};}
+  input[type=range]{accent-color:${t.accent};width:100%;}
+  .nb{animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+`;
+
+/* ─── SHARED UI ─── */
+const Pill = ({label,color}) =>
+  <span style={{display:"inline-flex",alignItems:"center",gap:3,padding:"2px 8px",borderRadius:20,fontSize:10,fontWeight:700,background:color+"22",color}}>{label}</span>;
+
+const Card = ({children,style,t}) =>
+  <div style={{background:t.card,border:`1px solid ${t.border}`,borderRadius:16,padding:16,backdropFilter:"blur(8px)",...style}}>{children}</div>;
+
+const SecTitle = ({children,t}) =>
+  <div style={{fontSize:10,fontWeight:800,color:t.sub,letterSpacing:2,marginBottom:12}}>{children}</div>;
+
+const Av = ({initials,size=38,t,grad}) =>
+  <div style={{width:size,height:size,borderRadius:"50%",background:grad||`linear-gradient(135deg,${t.accent},#6366F1)`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:size/2.8,color:"#FFF",flexShrink:0}}>{initials}</div>;
+
+const PBar = ({value,max,color,t}) => {
+  const p = Math.min(100,Math.round((value/max)*100));
+  return (
+    <div>
+      <div style={{background:t.border,borderRadius:6,height:7,overflow:"hidden"}}>
+        <div className="pb" style={{height:"100%",borderRadius:6,background:p>=100?"#34D399":color||t.accent,width:`${p}%`}}/>
+      </div>
+      <div style={{fontSize:10,color:t.sub,marginTop:3}}>{p}%</div>
+    </div>
+  );
+};
+
+const Fld = ({label,value,onChange,placeholder,type="text",onKeyDown,t}) => (
+  <div style={{marginBottom:14}}>
+    {label&&<label style={{fontSize:10,fontWeight:800,color:t.sub,display:"block",marginBottom:6}}>{label}</label>}
+    <input value={value} onChange={onChange} placeholder={placeholder} type={type} onKeyDown={onKeyDown}
+      style={{width:"100%",background:t.inputBg,border:`1px solid ${t.inputBorder}`,borderRadius:10,padding:"13px 14px",fontSize:14,color:t.text}}/>
+  </div>
+);
+
+const ErrBox = ({msg}) => msg
+  ? <div style={{fontSize:12,color:"#F87171",marginBottom:14,background:"#F8717110",border:"1px solid #F8717130",borderRadius:8,padding:"8px 12px"}}>{msg}</div>
+  : null;
+
+const PBtn = ({onClick,children,color,style,t,disabled}) =>
+  <button onClick={onClick} disabled={disabled} className="s"
+    style={{width:"100%",background:color||`linear-gradient(135deg,${t.accent},#6366F1)`,border:"none",borderRadius:12,padding:15,color:"#FFF",fontWeight:800,fontSize:14,cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.5:1,...style}}>
+    {children}
+  </button>;
+
+const Loading = ({t}) => (
+  <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:t.bg,gap:16}}>
+    <div style={{fontFamily:"'Bebas Neue'",fontSize:42,letterSpacing:4,background:`linear-gradient(135deg,${t.accent},#EC4899)`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>INFLUENCE PRO</div>
+    <div style={{width:40,height:40,border:`3px solid ${t.border}`,borderTop:`3px solid ${t.accent}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+    <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+  </div>
+);
+
+function Modal({children,onClose,t}) {
+  return (
+    <div style={{position:"fixed",inset:0,background:"#00000085",backdropFilter:"blur(12px)",zIndex:100,display:"flex",alignItems:"flex-end"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:t.surface,borderRadius:"22px 22px 0 0",padding:"20px 20px 36px",width:"100%",maxWidth:430,margin:"0 auto",maxHeight:"92vh",overflowY:"auto",border:`1px solid ${t.border}`,borderBottom:"none"}} className="fi">
+        <div style={{width:40,height:4,background:t.border,borderRadius:2,margin:"0 auto 20px"}}/>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ─── LOGIN ─── */
+function LoginScreen({onLogin,onGoRegister,t,themeToggle,theme}) {
+  const [username,setUsername] = useState("");
+  const [pass,setPass]         = useState("");
+  const [err,setErr]           = useState("");
+  const [loading,setLoading]   = useState(false);
+
+  const submit = async () => {
+    if(!username.trim()){setErr("Informe seu usuário.");return;}
+    if(!pass){setErr("Informe sua senha.");return;}
+    setErr(""); setLoading(true);
+    try {
+      // Admin login
+      if(username.trim().toLowerCase()==="admin"&&pass==="admin123"){
+        try{localStorage.setItem("ip_admin_session","true");}catch(e){}
+        onLogin({isAdmin:true,name:"Administrador",avatar:"AD",uid:"admin"});
+        return;
+      }
+      // Busca usuário por username no Firestore
+      const users = await fsQuery("users","username",username.trim().toLowerCase());
+      if(!users.length){setErr("Usuário não encontrado.");setLoading(false);return;}
+      const user = users[0];
+      // Login no Firebase Auth com email gerado
+      await fbSignIn(user.email, pass);
+      onLogin(user);
+    } catch(e) {
+      console.error("Login error:", e);
+      if(e.code === "auth/user-not-found" || e.code === "auth/wrong-password" || e.code === "auth/invalid-credential") {
+        setErr("Usuário ou senha incorretos.");
+      } else if(e.code === "auth/network-request-failed") {
+        setErr("Sem conexão com internet.");
+      } else {
+        setErr("Erro: " + (e.message || e.code || "tente novamente"));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",padding:"32px 24px",background:t.bg}}>
+      <style>{makeCSS(t)}</style>
+      <div style={{position:"absolute",top:20,right:20}}>
+        <button onClick={themeToggle} className="s" style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:10,padding:"6px 12px",color:t.sub,cursor:"pointer",fontSize:16}}>{theme==="dark"?"☀️":"🌙"}</button>
+      </div>
+      <div className="fi" style={{textAlign:"center",marginBottom:40}}>
+        <div style={{fontFamily:"'Bebas Neue'",fontSize:58,letterSpacing:4,background:`linear-gradient(135deg,${t.accent},#EC4899)`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1}}>INFLUENCE</div>
+        <div style={{fontFamily:"'Bebas Neue'",fontSize:24,letterSpacing:8,color:t.sub}}>PRO</div>
+        <div style={{fontSize:12,color:t.sub,marginTop:8}}>Gestão para micro influenciadores</div>
+      </div>
+      <div className="fi2" style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:20,padding:24}}>
+        <div style={{fontSize:17,fontWeight:800,marginBottom:4,color:t.text}}>Entrar na sua conta</div>
+        <div style={{fontSize:12,color:t.sub,marginBottom:24}}>Bem-vindo de volta 👋</div>
+        <Fld label="USUÁRIO" value={username} onChange={e=>setUsername(e.target.value)} placeholder="seu_usuario" onKeyDown={e=>e.key==="Enter"&&submit()} t={t}/>
+        <Fld label="SENHA"   value={pass}     onChange={e=>setPass(e.target.value)}     placeholder="••••••" type="password" onKeyDown={e=>e.key==="Enter"&&submit()} t={t}/>
+        <ErrBox msg={err}/>
+        <PBtn onClick={submit} t={t} disabled={loading}>{loading?"Entrando...":"Entrar"}</PBtn>
+      </div>
+      <div className="fi3" style={{textAlign:"center",marginTop:20}}>
+        <span style={{fontSize:13,color:t.sub}}>Não tem conta? </span>
+        <button onClick={onGoRegister} style={{background:"none",border:"none",color:t.accent,fontWeight:700,fontSize:13,cursor:"pointer"}}>Cadastrar-se</button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── REGISTER ─── */
+function RegisterScreen({onBack,onRegister,t}) {
+  // Captura código de indicação da URL automaticamente
+  // Capture ref from URL (?ref=CODE) - works on GitHub Pages
+  const urlParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace('#',''));
+  const urlRef = urlParams.get('ref') || hashParams.get('ref') || '';
+  const [step,setStep]       = useState(1);
+  const [name,setName]       = useState("");
+  const [username,setUsr]    = useState("");
+  const [email,setEmail]     = useState("");
+  const [pass,setPass]       = useState("");
+  const [refCode,setRefCode] = useState(urlRef);
+  const [plan,setPlan]       = useState("free");
+  const [err,setErr]         = useState("");
+  const [loading,setLoading] = useState(false);
+
+  const next = async () => {
+    if(step===1){
+      if(!name.trim()||!username.trim()||!email.trim()||pass.length<6){setErr("Preencha todos os campos (senha mín. 6 caracteres).");return;}
+      // Checar username único
+      // Try username check (may need Firestore index)
+      try {
+        const existing = await fsQuery("users","username",username.trim().toLowerCase());
+        if(existing.length){setErr("Usuário já existe. Escolha outro.");return;}
+      } catch(indexErr) {
+        console.warn("Username check skipped:", indexErr.message);
+        // Continue without check if index not ready
+      }
+      setErr(""); setStep(2);
+    } else {
+      setLoading(true);
+      try {
+        // 1. Criar auth user
+        const cred = await fbSignUp(email.trim(), pass);
+        const uid  = cred.user.uid;
+        const refId = genRefId(name);
+
+        // 2. Calcular upline para rede de indicação
+        let referredBy = null;
+        if(refCode.trim()){
+          const refs = await fsQuery("users","referralId",refCode.trim().toUpperCase());
+          if(refs.length) referredBy = refs[0].id;
+        }
+
+        // 3. Salvar perfil no Firestore
+        const newUser = {
+          uid, email:email.trim(),
+          name:name.trim(),
+          handle:`@${username.trim().toLowerCase()}`,
+          username:username.trim().toLowerCase(),
+          plan:"free", avatar:name.trim().split(" ").map(w=>w[0]).join("").substr(0,2).toUpperCase(),
+          followers:0, referralId:refId,
+          referredBy, joinDate:new Date().toISOString().substr(0,10),
+          planRequestedAt: plan==="premium" ? new Date().toISOString() : null,
+          planExpiry: null,
+          balance:0, pixKey:"", monthlyEarnings:0, totalEarnings:0,
+          role:"user",
+        };
+        await fsSet("users", uid, newUser);
+
+        // 4. Registrar na rede do referrer (níveis 1, 2, 3)
+        if(referredBy){
+          const commission = plan==="premium"?1.00:0;
+          await fsAdd("referrals",{
+            referrerId:referredBy, referredId:uid,
+            referredName:newUser.name, referredPlan:plan,
+            level:1, commission, date:new Date().toISOString().substr(0,7),
+          });
+          // Nível 2
+          const lvl1User = await fsGet("users", referredBy);
+          if(lvl1User?.referredBy){
+            await fsAdd("referrals",{
+              referrerId:lvl1User.referredBy, referredId:uid,
+              referredName:newUser.name, referredPlan:plan,
+              level:2, commission:plan==="premium"?0.50:0,
+              date:new Date().toISOString().substr(0,7),
+            });
+            // Nível 3
+            const lvl2User = await fsGet("users", lvl1User.referredBy);
+            if(lvl2User?.referredBy){
+              await fsAdd("referrals",{
+                referrerId:lvl2User.referredBy, referredId:uid,
+                referredName:newUser.name, referredPlan:plan,
+                level:3, commission:plan==="premium"?0.30:0,
+                date:new Date().toISOString().substr(0,7),
+              });
+            }
+          }
+        }
+
+        // If selected premium, show notice
+        if(plan==="premium"){
+          alert("Conta criada! ✅\n\nVocê selecionou o plano Premium.\nPague R$ 10,00 via PIX: 06981774950\n\nApós o pagamento, o admin ativará seu Premium em até 24h.");
+        }
+        onRegister({...newUser, id:uid});
+      } catch(e) {
+        console.error("Register error:", e);
+        if(e.code === "auth/email-already-in-use") setErr("E-mail já cadastrado.");
+        else if(e.code === "auth/weak-password") setErr("Senha muito fraca. Use pelo menos 6 caracteres.");
+        else if(e.code === "auth/invalid-email") setErr("E-mail inválido.");
+        else if(e.code === "auth/network-request-failed") setErr("Sem conexão. Verifique sua internet.");
+        else if(e.code === "auth/configuration-not-found") setErr("Firebase não configurado. Aguarde e tente novamente.");
+        else setErr("Erro: " + (e.message || e.code || "desconhecido"));
+      } finally { setLoading(false); }
+    }
+  };
+
+  const PLANS = [
+    {key:"free",    name:"Free",      price:"Grátis",    color:"#6B7280", features:["Até 5 publis/mês","Dashboard básico","Calendário","1 meta","Indicação ativa"]},
+    {key:"premium", name:"Premium ✦", price:"R$ 10/mês", color:t.accent,  badge:"POPULAR", features:["Publis ILIMITADAS","Dashboard completo","Metas avançadas","Notificações","Dicas diárias","Relatórios","Indicação ativa","Saque ativo"]},
+  ];
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",padding:"32px 24px",background:t.bg}}>
+      <style>{makeCSS(t)}</style>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:32}}>
+        <button onClick={step>1?()=>{setErr("");setStep(1);}:onBack} style={{background:t.surface,border:`1px solid ${t.border}`,color:t.sub,borderRadius:10,width:36,height:36,cursor:"pointer",fontSize:18}}>←</button>
+        <div>
+          <div style={{fontFamily:"'Bebas Neue'",fontSize:22,letterSpacing:3,background:`linear-gradient(135deg,${t.accent},#EC4899)`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>INFLUENCE PRO</div>
+          <div style={{fontSize:11,color:t.sub}}>Criar conta</div>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:28}}>
+        {["Perfil","Plano"].map((s,i)=>(
+          <div key={i} style={{flex:1}}>
+            <div style={{height:4,borderRadius:2,background:i<step?t.accent:t.border,marginBottom:4,transition:"background .3s"}}/>
+            <div style={{fontSize:9,color:i<step?t.accent:t.sub,fontWeight:800,textAlign:"center"}}>{s.toUpperCase()}</div>
+          </div>
+        ))}
+      </div>
+      <div className="fi" style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:20,padding:24}}>
+        {step===1&&(
+          <>
+            <div style={{fontSize:18,fontWeight:800,marginBottom:4,color:t.text}}>Seu perfil</div>
+            <div style={{fontSize:12,color:t.sub,marginBottom:20}}>Como você vai aparecer no app</div>
+            <Fld label="NOME COMPLETO"                  value={name}    onChange={e=>setName(e.target.value)}    placeholder="Camila Rocha"   t={t}/>
+            <Fld label="USUÁRIO (sem @)"                value={username} onChange={e=>setUsr(e.target.value)}    placeholder="camilarocha"    t={t}/>
+            <Fld label="E-MAIL"                         value={email}   onChange={e=>setEmail(e.target.value)}   placeholder="seu@email.com"  type="email" t={t}/>
+            <Fld label="SENHA (mín. 6 caracteres)"      value={pass}    onChange={e=>setPass(e.target.value)}    placeholder="••••••"         type="password" t={t}/>
+            <Fld label="CÓDIGO DE INDICAÇÃO (opcional)" value={refCode} onChange={e=>setRefCode(e.target.value)} placeholder="Ex: CAM2847"    t={t}/>
+          </>
+        )}
+        {step===2&&(
+          <>
+            <div style={{fontSize:18,fontWeight:800,marginBottom:4,color:t.text}}>Escolha seu plano</div>
+            <div style={{fontSize:12,color:t.sub,marginBottom:20}}>Pode mudar depois</div>
+            {PLANS.map(p=>(
+              <div key={p.key} onClick={()=>setPlan(p.key)} className="s"
+                style={{background:plan===p.key?`${p.color}14`:t.inputBg,border:`2px solid ${plan===p.key?p.color:t.border}`,borderRadius:16,padding:16,marginBottom:10,cursor:"pointer",position:"relative"}}>
+                {p.badge&&<div style={{position:"absolute",top:-9,right:12,background:p.color,color:"#FFF",fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:10}}>{p.badge}</div>}
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                  <div style={{fontSize:16,fontWeight:800,color:plan===p.key?p.color:t.text}}>{p.name}</div>
+                  <div style={{fontSize:18,fontWeight:800,color:p.color}}>{p.price}</div>
+                </div>
+                {p.features.map(f=><div key={f} style={{fontSize:11,color:t.sub,marginBottom:4,display:"flex",gap:6}}><span style={{color:p.color}}>✓</span>{f}</div>)}
+              </div>
+            ))}
+          </>
+        )}
+        <ErrBox msg={err}/>
+        <PBtn onClick={next} t={t} disabled={loading} style={{marginTop:4}}>{loading?"Salvando...":step===2?"Criar conta":"Continuar →"}</PBtn>
+      </div>
+    </div>
+  );
+}
+
+/* ─── PUBLI MODAL ─── */
+function PubliModal({onClose,onSave,onDelete,isPremium,currentCount,initial,t}) {
+  const isEdit = !!initial;
+  const [brand,setBrand]     = useState(initial?.brand||"");
+  const [type,setType]       = useState(initial?.type||"feed");
+  const [payment,setPayment] = useState(initial?.payment||"pago");
+  const [value,setValue]     = useState(initial?.value?.toString()||"");
+  const [status,setStatus]   = useState(initial?.status||"pendente");
+  const [delivery,setDelivery]=useState(initial?.delivery||"");
+  const [err,setErr]         = useState("");
+  const [saving,setSaving]   = useState(false);
+  const [deleting,setDeleting] = useState(false);
+  const [confirmDel,setConfirmDel] = useState(false);
+
+  const save = async () => {
+    if(!brand.trim()||!delivery){setErr("Preencha marca e data.");return;}
+    if(!isEdit&&!isPremium&&currentCount>=5){setErr("Limite Free atingido. Faça upgrade!");return;}
+    setSaving(true);
+    await onSave({...(initial||{}),brand:brand.trim(),type,payment,value:payment==="pago"?Number(value)||0:0,status,delivery,img:brand.substr(0,2).toUpperCase(),payStatus:initial?.payStatus||"aguardando"});
+    setSaving(false);
+  };
+
+  return (
+    <Modal onClose={onClose} t={t}>
+      <div style={{fontSize:18,fontWeight:800,marginBottom:4,color:t.text}}>{isEdit?"Editar Publicação":"Nova Publicação"}</div>
+      <div style={{fontSize:12,color:t.sub,marginBottom:20}}>Salvo automaticamente no Firebase</div>
+      <Fld label="NOME DA MARCA *"   value={brand}    onChange={e=>setBrand(e.target.value)}    placeholder="Ex: Nike, Shein..." t={t}/>
+      <Fld label="DATA DE ENTREGA *" value={delivery} onChange={e=>setDelivery(e.target.value)} type="date" t={t}/>
+      <div style={{marginBottom:14}}>
+        <label style={{fontSize:10,fontWeight:800,color:t.sub,display:"block",marginBottom:8}}>TIPO</label>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+          {["reels","feed","story"].map(tp=>(
+            <button key={tp} onClick={()=>setType(tp)} style={{padding:"10px 0",borderRadius:10,border:`2px solid ${type===tp?TYPE_COLOR[tp]:t.border}`,background:type===tp?`${TYPE_COLOR[tp]}18`:t.inputBg,color:type===tp?TYPE_COLOR[tp]:t.sub,fontWeight:800,fontSize:13,cursor:"pointer"}}>{TYPE_LABEL[tp]}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{marginBottom:14}}>
+        <label style={{fontSize:10,fontWeight:800,color:t.sub,display:"block",marginBottom:8}}>PAGAMENTO</label>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {[{k:"pago",l:"💸 Pago"},{k:"permuta",l:"🎁 Permuta"}].map(p=>(
+            <button key={p.k} onClick={()=>setPayment(p.k)} style={{padding:"12px 0",borderRadius:10,border:`2px solid ${payment===p.k?t.accent:t.border}`,background:payment===p.k?t.accentSoft:t.inputBg,color:payment===p.k?t.accent:t.sub,fontWeight:800,fontSize:13,cursor:"pointer"}}>{p.l}</button>
+          ))}
+        </div>
+      </div>
+      {payment==="pago"&&(
+        <div style={{marginBottom:14}}>
+          <label style={{fontSize:10,fontWeight:800,color:t.sub,display:"block",marginBottom:6}}>VALOR (R$)</label>
+          <input value={value} onChange={e=>setValue(e.target.value)} placeholder="0,00" type="number"
+            style={{width:"100%",background:t.inputBg,border:`1px solid ${t.inputBorder}`,borderRadius:10,padding:"13px 14px",fontSize:16,color:"#34D399",fontWeight:800,outline:"none"}}/>
+        </div>
+      )}
+      <div style={{marginBottom:16}}>
+        <label style={{fontSize:10,fontWeight:800,color:t.sub,display:"block",marginBottom:8}}>STATUS</label>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+          {["pendente","postado","atrasado"].map(s=>(
+            <button key={s} onClick={()=>setStatus(s)} style={{padding:"10px 0",borderRadius:10,border:`2px solid ${status===s?STATUS_COLOR[s]:t.border}`,background:status===s?`${STATUS_COLOR[s]}18`:t.inputBg,color:status===s?STATUS_COLOR[s]:t.sub,fontWeight:800,fontSize:11,cursor:"pointer"}}>{STATUS_ICON[s]} {s.charAt(0).toUpperCase()+s.slice(1)}</button>
+          ))}
+        </div>
+      </div>
+      <ErrBox msg={err}/>
+      <PBtn onClick={save} t={t} disabled={saving||deleting}>{saving?"Salvando...":isEdit?"Salvar Alterações":"Salvar Publicação"}</PBtn>
+      {isEdit&&(
+        !confirmDel ? (
+          <button onClick={()=>setConfirmDel(true)}
+            style={{width:"100%",marginTop:10,background:"none",border:"1px solid #F8717130",borderRadius:12,padding:12,color:"#F87171",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+            🗑 Excluir Publicação
+          </button>
+        ) : (
+          <div style={{marginTop:10,background:"#F8717110",border:"1px solid #F8717130",borderRadius:12,padding:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#F87171",marginBottom:10,textAlign:"center"}}>
+              ⚠️ Tem certeza? Esta ação não pode ser desfeita.
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <button onClick={()=>setConfirmDel(false)}
+                style={{padding:"11px 0",borderRadius:10,border:`1px solid ${t.border}`,background:t.inputBg,color:t.sub,fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                Cancelar
+              </button>
+              <button onClick={async()=>{
+                setDeleting(true);
+                await onDelete();
+                setDeleting(false);
+              }} disabled={deleting}
+                style={{padding:"11px 0",borderRadius:10,border:"none",background:"linear-gradient(135deg,#F87171,#EF4444)",color:"#FFF",fontWeight:800,fontSize:13,cursor:"pointer",opacity:deleting?0.6:1}}>
+                {deleting?"Excluindo...":"🗑 Confirmar"}
+              </button>
+            </div>
+          </div>
+        )
+      )}
+    </Modal>
+  );
+}
+
+
+/* ─── CAMPANHA MODAL ─── */
+function CampanhaModal({onClose,onSave,initial,t}) {
+  const isEdit = !!initial;
+  const [brand,setBrand]     = useState(initial?.brand||"");
+  const [valor,setValor]     = useState(initial?.value?.toString()||"");
+  const [payment,setPayment] = useState(initial?.payment||"pago");
+  const [inicio,setInicio]   = useState(initial?.inicio||"");
+  const [fim,setFim]         = useState(initial?.delivery||"");
+  const [itens,setItens]     = useState(initial?.campanhaItens||[
+    {tipo:"reels",qtd:2},
+    {tipo:"story",qtd:4},
+  ]);
+  const [err,setErr]   = useState("");
+  const [saving,setSaving] = useState(false);
+
+  const addItem = () => setItens(prev=>[...prev,{tipo:"reels",qtd:1}]);
+  const removeItem = i => setItens(prev=>prev.filter((_,idx)=>idx!==i));
+  const updateItem = (i,field,val) => setItens(prev=>prev.map((it,idx)=>idx===i?{...it,[field]:val}:it));
+
+  const totalPosts = itens.reduce((a,b)=>a+(Number(b.qtd)||0),0);
+
+  const save = async () => {
+    if(!brand.trim()||!inicio||!fim){setErr("Preencha marca, início e fim.");return;}
+    if(itens.length===0){setErr("Adicione ao menos 1 tipo de post.");return;}
+    setSaving(true);
+    await onSave({
+      brand:brand.trim(),
+      type:"campanha",
+      payment,
+      value:payment==="pago"?Number(valor)||0:0,
+      status:"pendente",
+      delivery:fim,
+      inicio,
+      campanhaItens:itens,
+      campanhaTotal:totalPosts,
+      campanhaFeito:initial?.campanhaFeito||0,
+      img:brand.substr(0,2).toUpperCase(),
+      payStatus:initial?.payStatus||"aguardando",
+    });
+    setSaving(false);
+  };
+
+  return (
+    <Modal onClose={onClose} t={t}>
+      <div style={{fontSize:18,fontWeight:800,marginBottom:2,color:t.text}}>{isEdit?"Editar Campanha":"Nova Campanha 📦"}</div>
+      <div style={{fontSize:12,color:t.sub,marginBottom:20}}>Pacote de posts combinados com a marca</div>
+
+      <Fld label="NOME DA MARCA *" value={brand} onChange={e=>setBrand(e.target.value)} placeholder="Ex: Nike, Shein..." t={t}/>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        <div>
+          <label style={{fontSize:10,fontWeight:800,color:t.sub,display:"block",marginBottom:6}}>INÍCIO *</label>
+          <input value={inicio} onChange={e=>setInicio(e.target.value)} type="date"
+            style={{width:"100%",background:t.inputBg,border:`1px solid ${t.inputBorder}`,borderRadius:10,padding:"12px 12px",fontSize:13,color:t.text,outline:"none"}}/>
+        </div>
+        <div>
+          <label style={{fontSize:10,fontWeight:800,color:t.sub,display:"block",marginBottom:6}}>FIM *</label>
+          <input value={fim} onChange={e=>setFim(e.target.value)} type="date"
+            style={{width:"100%",background:t.inputBg,border:`1px solid ${t.inputBorder}`,borderRadius:10,padding:"12px 12px",fontSize:13,color:t.text,outline:"none"}}/>
+        </div>
+      </div>
+
+      <div style={{marginBottom:14}}>
+        <label style={{fontSize:10,fontWeight:800,color:t.sub,display:"block",marginBottom:8}}>PAGAMENTO</label>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {[{k:"pago",l:"💸 Pago"},{k:"permuta",l:"🎁 Permuta"}].map(p=>(
+            <button key={p.k} onClick={()=>setPayment(p.k)} style={{padding:"11px 0",borderRadius:10,border:`2px solid ${payment===p.k?t.accent:t.border}`,background:payment===p.k?t.accentSoft:t.inputBg,color:payment===p.k?t.accent:t.sub,fontWeight:800,fontSize:13,cursor:"pointer"}}>{p.l}</button>
+          ))}
+        </div>
+      </div>
+
+      {payment==="pago"&&(
+        <div style={{marginBottom:14}}>
+          <label style={{fontSize:10,fontWeight:800,color:t.sub,display:"block",marginBottom:6}}>VALOR TOTAL DA CAMPANHA (R$)</label>
+          <input value={valor} onChange={e=>setValor(e.target.value)} placeholder="0,00" type="number"
+            style={{width:"100%",background:t.inputBg,border:`1px solid ${t.inputBorder}`,borderRadius:10,padding:"13px 14px",fontSize:16,color:"#34D399",fontWeight:800,outline:"none"}}/>
+        </div>
+      )}
+
+      {/* ITENS DO PACOTE */}
+      <div style={{marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <label style={{fontSize:10,fontWeight:800,color:t.sub}}>CONTEÚDOS DO PACOTE</label>
+          <button onClick={addItem} style={{background:t.accentSoft,border:`1px solid ${t.accent}44`,borderRadius:8,padding:"4px 12px",color:t.accent,fontSize:11,fontWeight:800,cursor:"pointer"}}>+ Adicionar</button>
+        </div>
+
+        {itens.map((it,i)=>(
+          <div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:8,background:t.inputBg,borderRadius:12,padding:"10px 12px"}}>
+            <select value={it.tipo} onChange={e=>updateItem(i,"tipo",e.target.value)}
+              style={{flex:1,background:t.surface,border:`1px solid ${t.border}`,borderRadius:8,padding:"8px 10px",color:TYPE_COLOR[it.tipo]||t.text,fontSize:13,fontWeight:700,outline:"none"}}>
+              <option value="reels">🎬 Reels</option>
+              <option value="feed">📸 Feed</option>
+              <option value="story">📱 Story</option>
+            </select>
+            <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+              <button onClick={()=>updateItem(i,"qtd",Math.max(1,(Number(it.qtd)||1)-1))}
+                style={{width:28,height:28,borderRadius:8,border:`1px solid ${t.border}`,background:t.surface,color:t.text,fontSize:16,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+              <div style={{minWidth:28,textAlign:"center",fontSize:16,fontWeight:800,color:t.text}}>{it.qtd}</div>
+              <button onClick={()=>updateItem(i,"qtd",(Number(it.qtd)||1)+1)}
+                style={{width:28,height:28,borderRadius:8,border:`1px solid ${t.border}`,background:t.surface,color:t.text,fontSize:16,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+            </div>
+            <button onClick={()=>removeItem(i)}
+              style={{width:28,height:28,borderRadius:8,border:"1px solid #F8717130",background:"#F8717108",color:"#F87171",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+          </div>
+        ))}
+
+        <div style={{background:`${t.accent}0C`,border:`1px solid ${t.accent}22`,borderRadius:10,padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
+          <span style={{fontSize:12,color:t.sub,fontWeight:600}}>Total de posts no pacote</span>
+          <span style={{fontSize:18,fontWeight:800,color:t.accent}}>{totalPosts} posts</span>
+        </div>
+      </div>
+
+      <ErrBox msg={err}/>
+      <PBtn onClick={save} t={t} disabled={saving}>{saving?"Salvando...":isEdit?"Salvar Campanha":"Criar Campanha 📦"}</PBtn>
+    </Modal>
+  );
+}
+
+/* ─── ADD CAL MODAL ─── */
+function AddCalModal({onClose,onSave,date,t}) {
+  const [brand,setBrand] = useState("");
+  const [type,setType]   = useState("feed");
+  const [err,setErr]     = useState("");
+  const [saving,setSaving]=useState(false);
+  const save = async () => {
+    if(!brand.trim()){setErr("Informe a marca.");return;}
+    setSaving(true);
+    await onSave({brand:brand.trim(),type,date,tasks:["Criar conteúdo","Editar","Publicar"],done:[false,false,false]});
+    setSaving(false);
+  };
+  return (
+    <Modal onClose={onClose} t={t}>
+      <div style={{fontSize:18,fontWeight:800,marginBottom:4,color:t.text}}>Adicionar ao Calendário</div>
+      <div style={{fontSize:12,color:t.sub,marginBottom:20}}>Data: <b style={{color:t.accent}}>{date}</b></div>
+      <Fld label="MARCA" value={brand} onChange={e=>setBrand(e.target.value)} placeholder="Nome da marca" t={t}/>
+      <div style={{marginBottom:16}}>
+        <label style={{fontSize:10,fontWeight:800,color:t.sub,display:"block",marginBottom:8}}>TIPO</label>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+          {["reels","feed","story"].map(tp=>(
+            <button key={tp} onClick={()=>setType(tp)} style={{padding:"10px 0",borderRadius:10,border:`2px solid ${type===tp?TYPE_COLOR[tp]:t.border}`,background:type===tp?`${TYPE_COLOR[tp]}18`:t.inputBg,color:type===tp?TYPE_COLOR[tp]:t.sub,fontWeight:800,fontSize:13,cursor:"pointer"}}>{TYPE_LABEL[tp]}</button>
+          ))}
+        </div>
+      </div>
+      <ErrBox msg={err}/>
+      <PBtn onClick={save} t={t} disabled={saving}>{saving?"Salvando...":"Adicionar"}</PBtn>
+    </Modal>
+  );
+}
+
+/* ─── MAIN APP ─── */
+function MainApp({user,t,themeToggle,theme,onLogout}) {
+  const [tab,setTab]             = useState("dashboard");
+  const [publis,setPublis]       = useState([]);
+  const [checklist,setChecklist] = useState([]);
+  const [withdrawals,setWithdrawals] = useState([]);
+  const [referrals,setReferrals] = useState([]);
+  const [goals,setGoals]         = useState([]);
+  const [upline,setUpline]       = useState(null);
+  const [calMonth,setCalMonth]   = useState(new Date().getMonth());
+  const [calYear,setCalYear]     = useState(new Date().getFullYear());
+  const [selDay,setSelDay]       = useState(null);
+  const [showNew,setShowNew]     = useState(false);
+  const [editingPubli,setEditingPubli] = useState(null);
+  const [showWith,setShowWith]   = useState(false);
+  const [showPlans,setShowPlans] = useState(false);
+  const [pixCopied,setPixCopied]   = useState(false);
+  const [showPix,setShowPix]       = useState(false);
+  const [editGoal,setEditGoal]   = useState(null);
+  const [tipIdx]                 = useState(Math.floor(Math.random()*TIPS.length));
+  const [copied,setCopied]       = useState(false);
+  const [filterT,setFilterT]     = useState("todos");
+  const [filterP,setFilterP]     = useState("todos");
+  const [dismissed,setDismissed] = useState([]);
+  const [showAddCal,setShowAddCal]=useState(false);
+  const [showCampanha,setShowCampanha]=useState(false);
+  const [editingCampanha,setEditingCampanha]=useState(null);
+  const [pixKey,setPixKey]       = useState(user.pixKey||"");
+  const [loadingData,setLoadingData] = useState(true);
+  const [fixing,setFixing]           = useState(false);
+  const [fixResult,setFixResult]     = useState("");
+
+  const uid = user.id || user.uid;
+  // Debug: garantir que withdrawals está carregando
+  useEffect(()=>{
+    if(withdrawals.length>0){
+      console.log("Withdrawals carregados:", withdrawals.length, withdrawals.map(w=>({id:w.id,status:w.status,amount:w.amount})));
+    }
+  },[withdrawals]);
+
+  // ── Realtime listeners ──
+  useEffect(() => {
+    if(!uid) return;
+    setLoadingData(true);
+    const unsubs = [];
+
+    // Publis
+    unsubs.push(fsListen("publis","userId",uid, data => setPublis(data)));
+    // Checklist
+    unsubs.push(fsListen("checklist","userId",uid, data => setChecklist(data)));
+    // Withdrawals — tenta pelos dois campos possíveis
+    unsubs.push(fsListen("withdrawals","userId",uid, data => {
+      setWithdrawals(prev => {
+        // Merge: mantém registros de outros campos e adiciona os novos
+        const ids = new Set(data.map(d=>d.id));
+        const others = prev.filter(p=>!ids.has(p.id));
+        return [...data, ...others.filter(o=>o.userId===uid||o.uid===uid)];
+      });
+    }));
+    // Referrals desta pessoa
+    unsubs.push(fsListen("referrals","referrerId",uid, data => setReferrals(data)));
+
+    // Goals (documento único por usuário)
+    fsGet("goals", uid).then(d => {
+      if(d?.items) setGoals(d.items);
+      else setGoals([
+        {id:1,title:"Seguidores",current:0,target:50000,unit:"",icon:"👥"},
+        {id:2,title:"Publis no Mês",current:0,target:8,unit:"",icon:"📸"},
+        {id:3,title:"Faturamento Mês",current:0,target:5000,unit:"R$",icon:"💰"},
+        {id:4,title:"Engajamento",current:0,target:6.0,unit:"%",icon:"🔥"},
+      ]);
+    });
+
+    // Upline (quem indicou este usuário)
+    if(user.referredBy){
+      fsGet("users", user.referredBy).then(u => setUpline(u));
+    }
+
+    setTimeout(()=>setLoadingData(false), 1200);
+    return () => unsubs.forEach(u=>u());
+  }, [uid]);
+
+  const saveGoals = async (newGoals) => {
+    setGoals(newGoals);
+    await fsSet("goals", uid, {items:newGoals, userId:uid});
+  };
+
+  const today   = new Date().toISOString().substr(0,10);
+  const urgents = publis.filter(p=>p.status!=="postado"&&p.delivery<=today&&!dismissed.includes(p.id));
+  const dueSoon = publis.filter(p=>{const d=(new Date(p.delivery)-new Date())/86400000;return d>=0&&d<=2&&p.status!=="postado"&&!dismissed.includes(p.id);});
+  const alerts  = [...new Map([...urgents,...dueSoon].map(x=>[x.id,x])).values()];
+
+  const today2 = new Date().toISOString().substr(0,10);
+  const isPrem   = user.plan==="premium" && (!user.planExpiry || user.planExpiry >= today2);
+  const baseUrl  = window.location.origin + window.location.pathname;
+  const refLink  = `${baseUrl}?ref=${user.referralId}`;
+  // Also support hash-based ref for GitHub Pages
+  const refLinkFull = refLink;
+  const filtered = publis.filter(p=>(filterT==="todos"||p.type===filterT)&&(filterP==="todos"||p.payment===filterP));
+  const lvl1     = referrals.filter(r=>r.level===1);
+  const lvl2     = referrals.filter(r=>r.level===2);
+  const lvl3     = referrals.filter(r=>r.level===3);
+  const totRef         = referrals.reduce((a,r)=>a+r.commission,0);
+  const totalSacado    = withdrawals.filter(w=>w.status==="pago").reduce((a,b)=>a+(b.amount||0),0);
+  const totalPendente  = withdrawals.filter(w=>w.status==="aguardando").reduce((a,b)=>a+(b.amount||0),0);
+  const saldoDisponivel= Math.max(0, totRef - totalSacado - totalPendente);
+  const temPendente    = withdrawals.some(w=>w.status==="aguardando");
+  const totPago  = publis.filter(p=>p.payment==="pago").reduce((a,b)=>a+b.value,0);
+  const totPerm  = publis.filter(p=>p.payment==="permuta").length;
+
+  const publiForDay = d => {
+    const ds=`${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    return checklist.filter(c=>c.date===ds);
+  };
+  const selDateStr = selDay?`${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(selDay).padStart(2,"0")}`:"";
+
+  const toggleTask = async (cid, ti) => {
+    const item = checklist.find(c=>c.id===cid);
+    if(!item) return;
+    const newDone = item.done.map((d,i)=>i===ti?!d:d);
+    setChecklist(prev=>prev.map(c=>c.id!==cid?c:{...c,done:newDone}));
+    await fsUpdate("checklist", cid, {done:newDone});
+  };
+
+  const NAV=[{id:"dashboard",icon:"⬡",label:"Home"},{id:"publis",icon:"◈",label:"Publis"},{id:"calendario",icon:"◷",label:"Agenda"},{id:"metas",icon:"◎",label:"Metas"},{id:"indicacao",icon:"⬟",label:"Rede"}];
+
+  if(loadingData) return <Loading t={t}/>;
+
+  return (
+    <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",background:t.bg,minHeight:"100vh",maxWidth:430,margin:"0 auto",color:t.text}}>
+      <style>{makeCSS(t)}</style>
+
+      {/* TOP BAR */}
+      <div style={{background:t.navBg,padding:"16px 16px 0",position:"sticky",top:0,zIndex:50}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <Av initials={user.avatar} t={t}/>
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:t.text}}>{user.name}</div>
+              <div style={{fontSize:11,color:t.accent}}>{user.handle}</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            {alerts.length>0&&<div className="nb" style={{background:"#F8717118",border:"1px solid #F8717140",color:"#F87171",borderRadius:8,padding:"3px 8px",fontSize:10,fontWeight:800}}>⚠ {alerts.length}</div>}
+            <button onClick={themeToggle} className="s" style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:14}}>{theme==="dark"?"☀️":"🌙"}</button>
+            <span onClick={()=>setShowPlans(true)} className="s" style={{background:isPrem?t.accentSoft:t.surface,color:isPrem?t.accent:t.sub,padding:"4px 10px",borderRadius:20,fontSize:10,fontWeight:800,cursor:"pointer",border:`1px solid ${isPrem?t.accent+"44":t.border}`}}>{isPrem?"✦ PRO":"FREE"}</span>
+            <button onClick={onLogout} className="s" style={{background:"#F8717114",border:"1px solid #F8717128",color:"#F87171",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Sair</button>
+          </div>
+        </div>
+        <div style={{display:"flex",borderBottom:`1px solid ${t.border}`}}>
+          {NAV.map(n=>(
+            <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,padding:"8px 2px",background:"none",border:"none",borderBottom:`2px solid ${tab===n.id?t.accent:"transparent"}`,color:tab===n.id?t.accent:t.sub,cursor:"pointer",fontSize:10,fontWeight:800,display:"flex",flexDirection:"column",alignItems:"center",gap:2,transition:"all .2s",marginBottom:-1}}>
+              <span style={{fontSize:15}}>{n.icon}</span>{n.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab==="dashboard"&&<div style={{margin:"12px 16px 0",background:t.accentSoft,border:`1px solid ${t.accent}22`,borderRadius:12,padding:"10px 14px",fontSize:12,color:t.accent,fontStyle:"italic"}}>{TIPS[tipIdx]}</div>}
+
+      {alerts.length>0&&tab==="dashboard"&&(
+        <div style={{margin:"10px 16px 0"}}>
+          {alerts.map(p=>(
+            <div key={p.id} style={{background:"#F8717108",border:"1px solid #F8717128",borderRadius:10,padding:"9px 14px",marginBottom:6,display:"flex",alignItems:"center",gap:8}}>
+              <span>📣</span>
+              <div style={{fontSize:12,color:"#FCA5A5",flex:1}}><b>{p.status==="atrasado"?"ATRASADO:":"HOJE:"}</b> poste {TYPE_LABEL[p.type]} da <b>{p.brand}</b></div>
+              <button onClick={()=>setDismissed(prev=>[...prev,p.id])} style={{background:"none",border:"none",color:"#F87171",cursor:"pointer",fontSize:18,padding:"0 4px"}}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{padding:"16px 16px 100px",overflowY:"auto",maxHeight:"calc(100vh - 130px)"}}>
+
+        {/* ══ DASHBOARD ══ */}
+        {tab==="dashboard"&&(
+          <div className="fi">
+            <div style={{background:`linear-gradient(135deg,${t.accent}22,#6366F122)`,border:`1px solid ${t.accent}33`,borderRadius:18,padding:20,marginBottom:14}}>
+              <div style={{fontSize:11,color:t.accent,fontWeight:700,letterSpacing:2,marginBottom:4}}>FATURAMENTO TOTAL</div>
+              <div style={{fontSize:36,fontWeight:800,letterSpacing:-1,color:t.text}}>R$ {totPago.toLocaleString("pt-BR")}</div>
+              <div style={{fontSize:11,color:t.sub,marginTop:2}}>+ {totPerm} permutas</div>
+            </div>
+            {(()=>{
+              const now = new Date();
+              const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
+              const weekEnd   = new Date(now); weekEnd.setDate(now.getDate() + (6 - now.getDay()));
+              const ws = weekStart.toISOString().substr(0,10);
+              const we = weekEnd.toISOString().substr(0,10);
+              const semana   = publis.filter(p=>p.delivery>=ws&&p.delivery<=we);
+              const pendSem  = semana.filter(p=>p.status!=="postado");
+              const atraso   = publis.filter(p=>p.status==="atrasado");
+              const mes      = publis.filter(p=>p.delivery&&p.delivery.substr(0,7)===today.substr(0,7));
+              return (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                  <Card t={t} style={{padding:"14px 16px"}}>
+                    <div style={{fontSize:10,color:t.sub,fontWeight:700,marginBottom:4}}>PUBLIS DA SEMANA</div>
+                    <div style={{fontSize:22,fontWeight:800,color:"#FBBF24"}}>{semana.length}</div>
+                    <div style={{fontSize:10,color:t.sub}}>{pendSem.length} pendentes</div>
+                  </Card>
+                  <Card t={t} style={{padding:"14px 16px"}}>
+                    <div style={{fontSize:10,color:t.sub,fontWeight:700,marginBottom:4}}>PUBLIS DO MÊS</div>
+                    <div style={{fontSize:22,fontWeight:800,color:"#34D399"}}>{mes.length}</div>
+                    <div style={{fontSize:10,color:t.sub}}>{publis.filter(p=>p.payment==="pago"&&p.delivery&&p.delivery.substr(0,7)===today.substr(0,7)).length} pagas</div>
+                  </Card>
+                  <Card t={t} style={{padding:"14px 16px"}}>
+                    <div style={{fontSize:10,color:t.sub,fontWeight:700,marginBottom:4}}>ATRASADAS</div>
+                    <div style={{fontSize:22,fontWeight:800,color:"#F87171"}}>{atraso.length}</div>
+                    <div style={{fontSize:10,color:t.sub}}>requerem atenção</div>
+                  </Card>
+                  <Card t={t} style={{padding:"14px 16px"}}>
+                    <div style={{fontSize:10,color:t.sub,fontWeight:700,marginBottom:4}}>GANHOS REF.</div>
+                    <div style={{fontSize:22,fontWeight:800,color:t.accent}}>R$ {totRef.toFixed(2)}</div>
+                    <div style={{fontSize:10,color:t.sub}}>{referrals.length} indicados</div>
+                  </Card>
+                </div>
+              );
+            })()}
+            <Card t={t} style={{marginBottom:14}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <div style={{fontSize:13,fontWeight:700,color:t.text}}>Meu Link de Indicação</div>
+                <div style={{fontSize:11,color:"#34D399",fontWeight:700}}>R$ {totRef.toFixed(2)}</div>
+              </div>
+              <div style={{background:t.inputBg,borderRadius:10,padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:10}}>
+                <div style={{fontSize:11,color:t.accent,fontWeight:800,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{refLink}</div>
+                <button onClick={()=>{
+                  if(navigator.share){
+                    navigator.share({title:"Influence PRO",text:"Use meu link para se cadastrar!",url:refLink}).catch(()=>{});
+                  } else {
+                    navigator.clipboard?.writeText(refLink).catch(()=>{});
+                    setCopied(true);
+                    setTimeout(()=>setCopied(false),3000);
+                  }
+                }} className="s"
+                  style={{background:copied?"#34D39918":t.accentSoft,color:copied?"#34D399":t.accent,border:`1px solid ${copied?"#34D39930":t.accent+"30"}`,borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:800,cursor:"pointer",flexShrink:0}}>
+                  {navigator.share?"📤 Compartilhar":copied?"✓ Copiado!":"Copiar"}
+                </button>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+                {[{label:"👥 Indicados",val:referrals.length},{label:"💰 Este mês",val:`R$ ${(user.monthlyEarnings||0).toFixed(2)}`},{label:"💳 Saldo p/ saque",val:`R$ ${saldoDisponivel.toFixed(2)}`}].map(s=>(
+                  <div key={s.label} style={{background:t.inputBg,borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
+                    <div style={{fontSize:11,color:t.sub,marginBottom:4}}>{s.label}</div>
+                    <div style={{fontSize:13,fontWeight:800,color:t.accent}}>{s.val}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+            <SecTitle t={t}>ÚLTIMAS PUBLIS</SecTitle>
+            {publis.length===0&&<div style={{textAlign:"center",padding:24,color:t.sub,fontSize:13}}>Nenhuma publi ainda. Toque em + para adicionar!</div>}
+            {publis.slice(0,4).map(p=>(
+              <div key={p.id} className="s" onClick={()=>setEditingPubli(p)} style={{background:t.card,border:`1px solid ${t.border}`,borderRadius:14,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:42,height:42,borderRadius:10,background:`${TYPE_COLOR[p.type]}18`,border:`1px solid ${TYPE_COLOR[p.type]}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:TYPE_COLOR[p.type],flexShrink:0}}>{p.img}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:700,marginBottom:3,color:t.text}}>{p.brand}</div>
+                  <div style={{display:"flex",gap:5}}>
+                    <Pill label={TYPE_LABEL[p.type]} color={TYPE_COLOR[p.type]}/>
+                    <Pill label={`${STATUS_ICON[p.status]} ${p.status}`} color={STATUS_COLOR[p.status]}/>
+                  </div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontSize:14,fontWeight:800,color:t.text}}>{p.payment==="pago"?`R$ ${p.value}`:"Permuta"}</div>
+                  <div style={{fontSize:10,color:t.sub}}>{p.delivery}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ══ PUBLIS ══ */}
+        {tab==="publis"&&(
+          <div className="fi">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <div>
+                <div style={{fontSize:20,fontWeight:800,color:t.text}}>Minhas Publis</div>
+                <div style={{fontSize:11,color:t.sub}}>{publis.length} publicações</div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>setShowCampanha(true)} className="s" style={{background:"linear-gradient(135deg,#A78BFA,#7C3AED)",border:"none",borderRadius:12,padding:"8px 12px",color:"#FFF",fontWeight:800,fontSize:12,cursor:"pointer"}}>📦 Campanha</button>
+                <button onClick={()=>setShowNew(true)} className="s" style={{background:`linear-gradient(135deg,${t.accent},#6366F1)`,border:"none",borderRadius:12,padding:"8px 16px",color:"#FFF",fontWeight:800,fontSize:13,cursor:"pointer"}}>+ Nova</button>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,marginBottom:14}}>
+              {["todos","reels","feed","story","campanha"].map(f=>(
+                <button key={f} onClick={()=>setFilterT(f)} className="s" style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${filterT===f?(TYPE_COLOR[f]||t.accent)+"88":t.border}`,background:filterT===f?`${TYPE_COLOR[f]||t.accent}18`:t.surface,color:filterT===f?TYPE_COLOR[f]||t.accent:t.sub,fontWeight:700,fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>{f.charAt(0).toUpperCase()+f.slice(1)}</button>
+              ))}
+              <div style={{width:1,background:t.border,flexShrink:0}}/>
+              {["todos","pago","permuta"].map(f=>(
+                <button key={f} onClick={()=>setFilterP(f)} className="s" style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${filterP===f?"#34D39968":t.border}`,background:filterP===f?"#34D39914":t.surface,color:filterP===f?"#34D399":t.sub,fontWeight:700,fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>{f==="pago"?"💸 Pago":f==="permuta"?"🎁 Permuta":"Todos"}</button>
+              ))}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:16}}>
+              {[{l:"Reels",c:"#F87171"},{l:"Feed",c:"#34D399"},{l:"Story",c:"#FBBF24"}].map(s=>(
+                <div key={s.l} style={{background:`${s.c}0C`,border:`1px solid ${s.c}28`,borderRadius:12,padding:12,textAlign:"center"}}>
+                  <div style={{fontSize:22,fontWeight:800,color:s.c}}>{publis.filter(p=>p.type===s.l.toLowerCase()).length}</div>
+                  <div style={{fontSize:10,color:t.sub}}>{s.l}</div>
+                </div>
+              ))}
+            </div>
+            {filtered.length===0&&<div style={{textAlign:"center",padding:32,color:t.sub,fontSize:13}}>Nenhuma publi encontrada.</div>}
+            {filtered.map(p=>(
+              p.type==="campanha" ? (
+              // ── CARD CAMPANHA ──
+              <div key={p.id} onClick={()=>setEditingCampanha(p)} className="s"
+                style={{background:t.card,border:`2px solid #A78BFA44`,borderRadius:16,padding:16,marginBottom:10,position:"relative"}}>
+                <div style={{position:"absolute",top:-10,left:16,background:"linear-gradient(135deg,#A78BFA,#7C3AED)",color:"#FFF",fontSize:9,fontWeight:800,padding:"2px 10px",borderRadius:20,letterSpacing:1}}>📦 CAMPANHA</div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,marginTop:4}}>
+                  <div>
+                    <div style={{fontSize:15,fontWeight:800,color:t.text,marginBottom:2}}>{p.brand}</div>
+                    <div style={{fontSize:11,color:t.sub}}>{p.inicio} → {p.delivery}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:16,fontWeight:800,color:p.payment==="pago"?"#34D399":"#FBBF24"}}>{p.payment==="pago"?`R$ ${p.value}`:"Permuta"}</div>
+                    <Pill label={(p.campanhaLog||[]).length>=(p.campanhaTotal||1)?"✅ Concluída":p.status==="atrasado"?"⚠ Atrasada":"⏳ Em andamento"} color={(p.campanhaLog||[]).length>=(p.campanhaTotal||1)?"#34D399":p.status==="atrasado"?"#F87171":"#A78BFA"}/>
+                  </div>
+                </div>
+                {/* Barra de progresso do pacote */}
+                {(()=>{
+                  const log   = p.campanhaLog||[];
+                  const feito = log.length;
+                  const total = p.campanhaTotal||1;
+                  const pct   = Math.min(100,Math.round(feito/total*100));
+                  return (
+                    <div style={{marginBottom:10}}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                        <span style={{fontSize:11,color:t.sub}}>Progresso do pacote</span>
+                        <span style={{fontSize:11,fontWeight:800,color:"#A78BFA"}}>{feito}/{total} posts</span>
+                      </div>
+                      <div style={{background:t.border,borderRadius:6,height:8,overflow:"hidden"}}>
+                        <div style={{height:"100%",borderRadius:6,background:pct>=100?"#34D399":"linear-gradient(90deg,#A78BFA,#7C3AED)",width:`${pct}%`,transition:"width .5s"}}/>
+                      </div>
+                    </div>
+                  );
+                })()}
+                {/* Itens com contagem individual */}
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                  {(p.campanhaItens||[]).map((it,i)=>{
+                    const feitosDeste=(p.campanhaLog||[]).filter(l=>l.tipo===it.tipo).length;
+                    const concluido=feitosDeste>=(it.qtd||0);
+                    return (
+                      <span key={i} style={{background:concluido?"#34D39918":`${TYPE_COLOR[it.tipo]||"#A78BFA"}18`,border:`1px solid ${concluido?"#34D39944":TYPE_COLOR[it.tipo]||"#A78BFA"}44`,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700,color:concluido?"#34D399":TYPE_COLOR[it.tipo]||"#A78BFA"}}>
+                        {concluido?"✓ ":""}{it.tipo==="reels"?"Reels":it.tipo==="feed"?"Feed":"Story"} {feitosDeste}/{it.qtd}
+                      </span>
+                    );
+                  })}
+                </div>
+                {/* Registrar por tipo */}
+                {(()=>{
+                  const itensRestantes = (p.campanhaItens||[]).map(it=>{
+                    const feitosDeste = (p.campanhaLog||[]).filter(l=>l.tipo===it.tipo).length;
+                    const restam = (it.qtd||0) - feitosDeste;
+                    return {...it, feitosDeste, restam};
+                  }).filter(it=>it.restam>0);
+
+                  const totalFeito = (p.campanhaLog||[]).length;
+                  const totalGeral = p.campanhaTotal||1;
+                  const concluida = totalFeito >= totalGeral;
+
+                  return (
+                    <div>
+                      {/* Contador por tipo */}
+                      <div style={{fontSize:10,fontWeight:800,color:"#A78BFA",marginBottom:8,letterSpacing:1}}>REGISTRAR POST ENTREGUE</div>
+                      {!concluida&&itensRestantes.length>0 ? (
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:8}}>
+                          {itensRestantes.map((it,i)=>(
+                            <button key={i} onClick={async e=>{
+                              e.stopPropagation();
+                              const log = [...(p.campanhaLog||[]),{tipo:it.tipo,data:new Date().toISOString().substr(0,10)}];
+                              const novoFeito = log.length;
+                              const novoStatus = novoFeito>=totalGeral?"postado":"pendente";
+                              await fsUpdate("publis",p.id,{campanhaLog:log,campanhaFeito:novoFeito,status:novoStatus});
+                            }} className="s"
+                              style={{background:`${TYPE_COLOR[it.tipo]||"#A78BFA"}18`,border:`2px solid ${TYPE_COLOR[it.tipo]||"#A78BFA"}55`,borderRadius:10,padding:"8px 4px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                              <span style={{fontSize:16}}>{TYPE_EMOJI[it.tipo]||"📦"}</span>
+                              <span style={{fontSize:10,fontWeight:800,color:TYPE_COLOR[it.tipo]||"#A78BFA"}}>{it.tipo==="reels"?"Reels":it.tipo==="feed"?"Feed":"Story"}</span>
+                              <span style={{fontSize:9,color:"#A78BFA",fontWeight:700}}>{it.restam} restam</span>
+                            </button>
+                          ))}
+                        </div>
+                      ):(
+                        <div style={{background:"#34D39914",border:"1px solid #34D39930",borderRadius:10,padding:"10px",textAlign:"center",marginBottom:8}}>
+                          <div style={{fontSize:13,fontWeight:800,color:"#34D399"}}>✅ Todos os posts entregues!</div>
+                        </div>
+                      )}
+
+                      {/* Histórico de posts */}
+                      {(p.campanhaLog||[]).length>0&&(
+                        <div style={{background:t.inputBg,borderRadius:10,padding:"8px 12px",marginBottom:6}}>
+                          <div style={{fontSize:9,fontWeight:800,color:"#A78BFA",marginBottom:6,letterSpacing:1}}>HISTÓRICO</div>
+                          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                            {[...(p.campanhaLog||[])].reverse().map((log,i)=>(
+                              <span key={i} style={{background:`${TYPE_COLOR[log.tipo]||"#A78BFA"}18`,border:`1px solid ${TYPE_COLOR[log.tipo]||"#A78BFA"}44`,borderRadius:20,padding:"2px 8px",fontSize:9,fontWeight:700,color:TYPE_COLOR[log.tipo]||"#A78BFA"}}>
+                                {log.tipo==="reels"?"Reels":log.tipo==="feed"?"Feed":"Story"} · {log.data}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Desfazer último */}
+                      {(p.campanhaLog||[]).length>0&&(
+                        <button onClick={async e=>{
+                          e.stopPropagation();
+                          const log = [...(p.campanhaLog||[])];
+                          log.pop();
+                          await fsUpdate("publis",p.id,{campanhaLog:log,campanhaFeito:log.length,status:log.length>0?"pendente":"pendente"});
+                        }} style={{width:"100%",background:"none",border:`1px solid ${t.border}`,borderRadius:10,padding:"6px",color:t.sub,fontWeight:600,fontSize:11,cursor:"pointer"}}>
+                          − Desfazer último registro
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+              ) : (
+              // ── CARD PUBLI NORMAL ──
+              <div key={p.id} onClick={()=>setEditingPubli(p)} className="s" style={{background:t.card,border:`1px solid ${p.status==="atrasado"?"#F8717138":t.border}`,borderRadius:16,padding:16,marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:44,height:44,borderRadius:12,background:`${TYPE_COLOR[p.type]}18`,border:`1px solid ${TYPE_COLOR[p.type]}38`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:TYPE_COLOR[p.type]}}>{p.img}</div>
+                    <div>
+                      <div style={{fontSize:14,fontWeight:700,color:t.text}}>{p.brand}</div>
+                      <div style={{fontSize:11,color:t.sub}}>Entrega: {p.delivery}</div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end"}}>
+                    <Pill label={`${STATUS_ICON[p.status]} ${p.status}`} color={STATUS_COLOR[p.status]}/>
+                    <Pill label={p.payStatus==="pago"?"💳 Pago":"⏳ Ag. pgto"} color={p.payStatus==="pago"?"#34D399":"#FBBF24"}/>
+                  </div>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{display:"flex",gap:6}}>
+                    <Pill label={TYPE_LABEL[p.type]} color={TYPE_COLOR[p.type]}/>
+                    <Pill label={p.payment==="pago"?"💸 Pago":"🎁 Permuta"} color={p.payment==="pago"?"#34D399":"#FBBF24"}/>
+                  </div>
+                  <div style={{fontSize:17,fontWeight:800,color:p.payment==="pago"?"#34D399":"#FBBF24"}}>{p.payment==="pago"?`R$ ${p.value}`:"Permuta"}</div>
+                </div>
+                <div style={{marginTop:6,fontSize:10,color:t.sub,textAlign:"right"}}>✏️ toque para editar</div>
+              </div>
+              )
+            ))}
+          </div>
+        )}
+
+        {/* ══ CALENDÁRIO ══ */}
+        {tab==="calendario"&&(
+          <div className="fi">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <div><div style={{fontSize:20,fontWeight:800,color:t.text}}>Agenda</div><div style={{fontSize:11,color:t.sub}}>Check-list de postagens</div></div>
+              {selDay&&<button onClick={()=>setShowAddCal(true)} className="s" style={{background:`linear-gradient(135deg,${t.accent},#6366F1)`,border:"none",borderRadius:12,padding:"8px 14px",color:"#FFF",fontWeight:800,fontSize:13,cursor:"pointer"}}>+ Adicionar</button>}
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:t.surface,border:`1px solid ${t.border}`,borderRadius:14,padding:"12px 18px",marginBottom:14}}>
+              <button onClick={()=>{if(calMonth===0){setCalMonth(11);setCalYear(y=>y-1);}else setCalMonth(m=>m-1);setSelDay(null);}} style={{background:"none",border:"none",color:t.accent,fontSize:22,cursor:"pointer"}}>‹</button>
+              <span style={{fontWeight:800,fontSize:16,color:t.text}}>{MONTHS[calMonth]} {calYear}</span>
+              <button onClick={()=>{if(calMonth===11){setCalMonth(0);setCalYear(y=>y+1);}else setCalMonth(m=>m+1);setSelDay(null);}} style={{background:"none",border:"none",color:t.accent,fontSize:22,cursor:"pointer"}}>›</button>
+            </div>
+            <div style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:16,padding:14,marginBottom:16}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:6}}>
+                {["D","S","T","Q","Q","S","S"].map((d,i)=><div key={i} style={{textAlign:"center",fontSize:9,color:t.sub,fontWeight:800,padding:"3px 0"}}>{d}</div>)}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
+                {Array(new Date(calYear,calMonth,1).getDay()).fill(null).map((_,i)=><div key={`e${i}`}/>)}
+                {Array(new Date(calYear,calMonth+1,0).getDate()).fill(null).map((_,i)=>{
+                  const day=i+1,dp=publiForDay(day),isSel=selDay===day,has=dp.length>0;
+                  return (
+                    <button key={day} onClick={()=>setSelDay(isSel?null:day)} style={{aspectRatio:"1",borderRadius:8,border:isSel?`2px solid ${t.accent}`:has?`1px solid ${t.accent}33`:`1px solid transparent`,background:isSel?t.accentSoft:has?"#7C6AF710":"transparent",color:isSel?t.accent:has?t.text:t.sub,fontSize:12,fontWeight:has?700:400,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1}}>
+                      {day}{has&&<div style={{width:4,height:4,borderRadius:"50%",background:t.accent}}/>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {selDay&&(()=>{
+              const dp=publiForDay(selDay);
+              return (
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:t.accent,marginBottom:10}}>{selDay} de {MONTHS[calMonth]} — {dp.length>0?`${dp.length} publi(s)`:"Nenhuma postagem"}</div>
+                  {dp.length===0&&<div style={{textAlign:"center",padding:24,color:t.sub,fontSize:12}}>Dia livre! 🎉 Use + para adicionar.</div>}
+                  {dp.map(c=>{
+                    const prog=c.done.filter(Boolean).length/c.tasks.length;
+                    return (
+                      <Card key={c.id} t={t} style={{marginBottom:10}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                          <div><div style={{fontSize:14,fontWeight:700,marginBottom:4,color:t.text}}>{c.brand}</div><Pill label={TYPE_LABEL[c.type]} color={TYPE_COLOR[c.type]}/></div>
+                          <div style={{fontSize:11,color:t.sub}}>{c.done.filter(Boolean).length}/{c.tasks.length}</div>
+                        </div>
+                        <PBar value={c.done.filter(Boolean).length} max={c.tasks.length} color={prog===1?"#34D399":t.accent} t={t}/>
+                        <div style={{marginTop:12}}>
+                          {c.tasks.map((task,idx)=>(
+                            <button key={idx} onClick={()=>toggleTask(c.id,idx)} style={{display:"flex",alignItems:"center",gap:10,width:"100%",background:"none",border:"none",padding:"8px 0",cursor:"pointer",borderBottom:idx<c.tasks.length-1?`1px solid ${t.border}`:"none",textAlign:"left"}}>
+                              <div style={{width:20,height:20,borderRadius:5,border:c.done[idx]?"none":`2px solid ${t.border}`,background:c.done[idx]?t.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s"}}>
+                                {c.done[idx]&&<span style={{color:"#FFF",fontSize:11,fontWeight:900}}>✓</span>}
+                              </div>
+                              <span style={{fontSize:13,color:c.done[idx]?t.sub:t.text,textDecoration:c.done[idx]?"line-through":"none"}}>{task}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+            {!selDay&&(
+              <>
+                <SecTitle t={t}>TODAS AS POSTAGENS</SecTitle>
+                {checklist.length===0&&<div style={{textAlign:"center",padding:24,color:t.sub,fontSize:13}}>Nenhuma postagem agendada.</div>}
+                {checklist.map(c=>{
+                  const prog=c.done.filter(Boolean).length/c.tasks.length;
+                  return (
+                    <div key={c.id} style={{background:t.card,border:`1px solid ${t.border}`,borderRadius:14,padding:14,marginBottom:8}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                        <div><div style={{fontSize:13,fontWeight:700,color:t.text}}>{c.brand}</div><div style={{fontSize:11,color:t.sub}}>{c.date}</div></div>
+                        <Pill label={TYPE_LABEL[c.type]} color={TYPE_COLOR[c.type]}/>
+                      </div>
+                      <PBar value={c.done.filter(Boolean).length} max={c.tasks.length} color={prog===1?"#34D399":t.accent} t={t}/>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ══ METAS ══ */}
+        {tab==="metas"&&(
+          <div className="fi">
+            <div style={{fontSize:20,fontWeight:800,marginBottom:4,color:t.text}}>Minhas Metas</div>
+            <div style={{fontSize:11,color:t.sub,marginBottom:20}}>Salvas automaticamente</div>
+            {goals.map((g,idx)=>{
+              const prog=Math.min(g.current/g.target,1),isEd=editGoal===g.id;
+              return (
+                <Card key={g.id} t={t} style={{marginBottom:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:26}}>{g.icon}</span>
+                      <div>
+                        <div style={{fontSize:14,fontWeight:700,color:t.text}}>{g.title}</div>
+                        <div style={{fontSize:11,color:t.sub}}>{g.unit}{g.current.toLocaleString("pt-BR")} / {g.unit}{g.target.toLocaleString("pt-BR")}</div>
+                      </div>
+                    </div>
+                    <button onClick={()=>setEditGoal(isEd?null:g.id)} style={{background:isEd?t.accentSoft:"none",border:`1px solid ${isEd?t.accent+"44":t.border}`,color:isEd?t.accent:t.sub,borderRadius:8,padding:"4px 12px",fontSize:11,cursor:"pointer",fontWeight:700}}>
+                      {isEd?"✓ Salvar":"Editar"}
+                    </button>
+                  </div>
+                  <PBar value={g.current} max={g.target} color={t.accent} t={t}/>
+                  {prog>=1&&<div style={{fontSize:11,color:"#34D399",marginTop:6,fontWeight:700}}>🎉 Meta atingida!</div>}
+                  {isEd&&(
+                    <div style={{borderTop:`1px solid ${t.border}`,paddingTop:14,marginTop:10}}>
+                      <div style={{marginBottom:12}}>
+                        <div style={{fontSize:11,color:t.sub,marginBottom:6,fontWeight:700}}>NOME DA META</div>
+                        <input value={g.title}
+                          onChange={e=>{const ng=goals.map((gx,i)=>i===idx?{...gx,title:e.target.value}:gx);saveGoals(ng);}}
+                          placeholder="Ex: Seguidores, Faturamento..."
+                          style={{width:"100%",background:t.inputBg,border:`1px solid ${t.inputBorder}`,borderRadius:10,padding:"10px 12px",fontSize:14,color:t.text,outline:"none",marginBottom:4}}/>
+                      </div>
+                      <div style={{marginBottom:12}}>
+                        <div style={{fontSize:11,color:t.sub,marginBottom:6,fontWeight:700}}>ATUAL: {g.unit}{g.current.toLocaleString("pt-BR")}</div>
+                        <input type="range" min={0} max={g.target*2} value={g.current}
+                          onChange={e=>{const ng=goals.map((gx,i)=>i===idx?{...gx,current:Number(e.target.value)}:gx);saveGoals(ng);}}/>
+                      </div>
+                      <div>
+                        <div style={{fontSize:11,color:t.sub,marginBottom:6,fontWeight:700}}>META: {g.unit}{g.target.toLocaleString("pt-BR")}</div>
+                        <input type="range" min={0} max={g.target*3} value={g.target}
+                          onChange={e=>{const ng=goals.map((gx,i)=>i===idx?{...gx,target:Number(e.target.value)}:gx);saveGoals(ng);}}/>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+            {!isPrem&&goals.length>=1?(
+              <div onClick={()=>setShowPlans(true)} className="s" style={{width:"100%",background:t.accentSoft,border:`2px dashed ${t.accent}44`,borderRadius:14,padding:16,color:t.accent,fontSize:12,fontWeight:700,cursor:"pointer",textAlign:"center"}}>🔒 Metas avançadas — Premium</div>
+            ):(
+              <button onClick={()=>{const ng=[...goals,{id:Date.now(),title:"Nova Meta",current:0,target:100,unit:"",icon:"🎯"}];saveGoals(ng);}} style={{width:"100%",background:"none",border:`2px dashed ${t.border}`,borderRadius:14,padding:16,color:t.sub,fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Adicionar Meta</button>
+            )}
+          </div>
+        )}
+
+        {/* ══ REDE ══ */}
+        {tab==="indicacao"&&(
+          <div className="fi">
+            <div style={{fontSize:20,fontWeight:800,marginBottom:4,color:t.text}}>Programa de Indicação</div>
+            <div style={{fontSize:11,color:t.sub,marginBottom:20}}>Comissões em 3 níveis</div>
+
+            {upline&&(
+              <Card t={t} style={{marginBottom:14,background:"#34D39910",border:"1px solid #34D39930"}}>
+                <div style={{fontSize:11,fontWeight:800,color:"#34D399",marginBottom:8}}>👆 VOCÊ FOI INDICADO POR</div>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <Av initials={upline.avatar} size={36} t={t} grad="linear-gradient(135deg,#34D399,#059669)"/>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:t.text}}>{upline.name}</div>
+                    <div style={{fontSize:11,color:t.sub}}>{upline.handle} · {upline.referralId}</div>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            <Card t={t} style={{marginBottom:14,background:`linear-gradient(135deg,${t.accent}12,#6366F112)`,border:`1px solid ${t.accent}30`}}>
+              <div style={{fontSize:12,fontWeight:700,color:t.accent,marginBottom:8}}>SEU LINK DE INDICAÇÃO</div>
+              <div style={{background:t.inputBg,borderRadius:10,padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:10}}>
+                <div style={{fontSize:12,color:t.accent,fontWeight:800,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{refLink}</div>
+                <button onClick={()=>{
+                  if(navigator.share){
+                    navigator.share({title:"Influence PRO",text:"Use meu link para se cadastrar no Influence PRO!",url:refLink})
+                      .catch(()=>{});
+                  } else {
+                    navigator.clipboard?.writeText(refLink).catch(()=>{});
+                    setCopied(true);
+                    setTimeout(()=>setCopied(false),3000);
+                  }
+                }} className="s"
+                  style={{background:copied?"#34D39914":t.accentSoft,color:copied?"#34D399":t.accent,border:`1px solid ${copied?"#34D39930":t.accent+"30"}`,borderRadius:8,padding:"6px 12px",fontSize:11,fontWeight:800,cursor:"pointer",flexShrink:0}}>
+                  {navigator.share?"📤 Compartilhar":copied?"✓ Copiado!":"👉 Copiar"}
+                </button>
+              </div>
+              <div style={{fontSize:11,color:t.sub}}>ID: <span style={{color:t.accent,fontWeight:800}}>{user.referralId}</span></div>
+            </Card>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
+              {[{level:"1ª Linha",pct:"10%",count:lvl1.length,color:t.accent},{level:"2ª Linha",pct:"5%",count:lvl2.length,color:"#6366F1"},{level:"3ª Linha",pct:"3%",count:lvl3.length,color:"#60A5FA"}].map(l=>(
+                <div key={l.level} style={{background:`${l.color}0C`,border:`1px solid ${l.color}28`,borderRadius:14,padding:"14px 10px",textAlign:"center"}}>
+                  <div style={{fontSize:22,fontWeight:800,color:l.color}}>{l.pct}</div>
+                  <div style={{fontSize:10,fontWeight:800,color:t.text,marginBottom:2}}>{l.level}</div>
+                  <div style={{marginTop:6,background:`${l.color}20`,borderRadius:20,padding:"2px 8px",fontSize:12,fontWeight:800,color:l.color}}>{l.count}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+              {[{label:"👥 Total indicados",val:referrals.length},{label:"💰 Ganhos totais",val:`R$ ${totRef.toFixed(2)}`},{label:"💳 Saldo disponível",val:`R$ ${saldoDisponivel.toFixed(2)}`},{label:"🧬 Na rede",val:lvl1.length+lvl2.length+lvl3.length}].map(s=>(
+                <Card key={s.label} t={t} style={{padding:"12px 14px"}}>
+                  <div style={{fontSize:10,color:t.sub,marginBottom:4}}>{s.label}</div>
+                  <div style={{fontSize:18,fontWeight:800,color:t.accent}}>{s.val}</div>
+                </Card>
+              ))}
+            </div>
+
+            <SecTitle t={t}>REDE DE INDICADOS</SecTitle>
+            {referrals.length===0&&<div style={{textAlign:"center",padding:32,color:t.sub,fontSize:13}}>Nenhum indicado ainda.<br/>Compartilhe seu link!</div>}
+            {referrals.map(r=>(
+              <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${t.border}`}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:32,height:32,borderRadius:"50%",background:r.level===1?t.accentSoft:r.level===2?"#6366F118":"#60A5FA18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:r.level===1?t.accent:r.level===2?"#6366F1":"#60A5FA"}}>L{r.level}</div>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:t.text}}>{r.referredName}</div>
+                    <div style={{fontSize:10,color:t.sub}}>{r.referredPlan} · {r.date}</div>
+                  </div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:14,fontWeight:800,color:r.commission>0?"#34D399":t.sub}}>{r.commission>0?`+R$ ${r.commission.toFixed(2)}`:"Free"}</div>
+                  <div style={{fontSize:9,color:t.sub}}>/mês</div>
+                </div>
+              </div>
+            ))}
+
+            <div style={{marginTop:20}}>
+              {isPrem?(()=>{
+                const lastWith = withdrawals.length>0 ? [...withdrawals].sort((a,b)=>(b.date||"").localeCompare(a.date||""))[0] : null;
+                const isPending   = lastWith && lastWith.status==="aguardando";
+                const isPaid     = lastWith && lastWith.status==="pago";
+                const isCanceled = lastWith && lastWith.status==="cancelado";
+                return (
+                  <div>
+                    {lastWith&&(
+                      <div style={{background:isPaid?"#34D39910":isCanceled?"#F8717110":"#FBBF2410",border:`1px solid ${isPaid?"#34D39930":isCanceled?"#F8717130":"#FBBF2430"}`,borderRadius:14,padding:16,marginBottom:12}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                          <div style={{fontSize:13,fontWeight:800,color:isPaid?"#34D399":isCanceled?"#F87171":"#FBBF24"}}>
+                            {isPaid?"✅ Saque Pago!":isCanceled?"❌ Saque Cancelado":"⏳ Aguardando Pagamento"}
+                          </div>
+                          <div style={{fontSize:16,fontWeight:800,color:isPaid?"#34D399":isCanceled?"#F87171":"#FBBF24"}}>R$ {lastWith.amount?.toFixed(2)}</div>
+                        </div>
+                        <div style={{fontSize:11,color:t.sub,marginBottom:4}}>PIX: <span style={{color:t.text,fontWeight:600}}>{lastWith.pixKey}</span></div>
+                        <div style={{fontSize:11,color:t.sub,marginBottom:10}}>
+                          Solicitado: {lastWith.date}
+                          {isPaid&&lastWith.paidAt&&<span style={{color:"#34D399"}}> · Pago: {lastWith.paidAt}</span>}
+                        </div>
+                        <div style={{background:t.inputBg,borderRadius:10,padding:"8px 12px",display:"flex",gap:8,alignItems:"center"}}>
+                          <div style={{width:8,height:8,borderRadius:"50%",background:isPaid?"#34D399":isCanceled?"#F87171":"#FBBF24",animation:isPaid||isCanceled?"none":"pulse 2s infinite",flexShrink:0}}/>
+                          <div style={{fontSize:12,color:isPaid?"#34D399":isCanceled?"#F87171":"#FBBF24",fontWeight:700}}>
+                            {isPaid?"Valor recebido via PIX ✓":isCanceled?"Saque cancelado pelo admin":"Processando — até 5 dias úteis"}
+                          </div>
+                        </div>
+                        {(isPaid||isCanceled)&&<div style={{fontSize:11,color:t.sub,marginTop:8,textAlign:"center"}}>Saldo disponível: R$ {saldoDisponivel.toFixed(2)}</div>}
+                      </div>
+                    )}
+                    {(!lastWith||isPaid||isCanceled)&&(
+                      saldoDisponivel > 0 ? (
+                        <button onClick={()=>setShowWith(true)} className="s" style={{width:"100%",background:"linear-gradient(135deg,#34D399,#059669)",border:"none",borderRadius:14,padding:16,color:"#FFF",fontWeight:800,fontSize:15,cursor:"pointer"}}>
+                          💸 Solicitar Saque — R$ {saldoDisponivel.toFixed(2)}
+                        </button>
+                      ) : (
+                        <div style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:14,padding:16,textAlign:"center"}}>
+                          <div style={{fontSize:13,fontWeight:700,color:t.sub,marginBottom:4}}>💰 Saldo disponível: R$ 0,00</div>
+                          <div style={{fontSize:11,color:t.sub}}>Indique mais amigos para acumular comissões!</div>
+                        </div>
+                      )
+                    )}
+                    {isPending&&!isCanceled&&(
+                      <div style={{textAlign:"center",fontSize:11,color:t.sub,marginTop:8}}>Aguarde o pagamento para solicitar novo saque.</div>
+                    )}
+                  </div>
+                );
+              })():(
+                <div onClick={()=>setShowPlans(true)} className="s" style={{background:t.surface,border:`2px dashed ${t.border}`,borderRadius:14,padding:16,textAlign:"center",cursor:"pointer"}}>
+                  <div style={{fontSize:13,fontWeight:700,color:t.sub,marginBottom:4}}>🔒 Saque disponível apenas no Premium</div>
+                  <div style={{fontSize:11,color:t.accent}}>Fazer upgrade →</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── MODALS ── */}
+      {(showNew||editingPubli)&&(
+        <PubliModal t={t}
+          onClose={()=>{setShowNew(false);setEditingPubli(null);}}
+          onDelete={async()=>{
+            if(!editingPubli) return;
+            // Excluir publi do Firestore
+            await fsDelete("publis", editingPubli.id);
+            // Excluir checklist vinculado (mesma marca + tipo)
+            const linked = checklist.find(c=>c.brand===editingPubli.brand&&c.type===editingPubli.type&&c.date===editingPubli.delivery);
+            if(linked) await fsDelete("checklist", linked.id);
+            setEditingPubli(null);
+          }}
+          onSave={async p=>{
+            if(editingPubli){
+              await fsUpdate("publis",editingPubli.id,p);
+              // Update checklist date if delivery changed
+              const existing = checklist.find(c=>c.brand===p.brand&&c.type===p.type);
+              if(existing && existing.date!==p.delivery){
+                await fsUpdate("checklist",existing.id,{date:p.delivery});
+              }
+            } else {
+              await fsAdd("publis",{...p,userId:uid});
+              // Auto-create checklist entry for this publi
+              await fsAdd("checklist",{
+                userId:uid,
+                brand:p.brand,
+                type:p.type,
+                date:p.delivery,
+                tasks:["Criar conteúdo","Revisar","Publicar"],
+                done:[false,false,false]
+              });
+            }
+            setShowNew(false);setEditingPubli(null);
+          }}
+          isPremium={isPrem} currentCount={publis.length} initial={editingPubli}
+        />
+      )}
+
+      {showWith&&(
+        <Modal onClose={()=>setShowWith(false)} t={t}>
+          <div style={{fontSize:18,fontWeight:800,marginBottom:4,color:t.text}}>Solicitar Saque</div>
+          <div style={{fontSize:12,color:t.sub,marginBottom:16}}>
+            Saldo disponível: <span style={{color:"#34D399",fontWeight:800}}>R$ {saldoDisponivel.toFixed(2)}</span>
+          </div>
+          {totalPendente>0&&<div style={{fontSize:11,color:"#FBBF24",background:"#FBBF2410",border:"1px solid #FBBF2430",borderRadius:8,padding:"8px 12px",marginBottom:12}}>⏳ R$ {totalPendente.toFixed(2)} em saque aguardando pagamento</div>}
+          <div style={{background:"#34D39910",border:"1px solid #34D39930",borderRadius:12,padding:12,marginBottom:8}}>
+            <div style={{fontSize:12,color:"#34D399",fontWeight:600}}>✓ Processado em até 5 dias úteis.</div>
+          </div>
+          <div style={{background:"#FBBF2410",border:"1px solid #FBBF2430",borderRadius:12,padding:12,marginBottom:16}}>
+            <div style={{fontSize:12,color:"#FBBF24",fontWeight:700}}>⏰ Pagamentos até às 18h do dia do saque.</div>
+          </div>
+          <Fld label="CHAVE PIX" value={pixKey} onChange={e=>setPixKey(e.target.value)} placeholder="CPF, e-mail ou telefone" t={t}/>
+          {!pixKey.trim()&&<div style={{fontSize:11,color:"#F87171",marginBottom:12}}>⚠ Informe sua chave PIX.</div>}
+          <PBtn onClick={async()=>{
+            if(!pixKey.trim()) return;
+            if(saldoDisponivel<=0){alert("Saldo insuficiente para saque.");return;}
+            await fsAdd("withdrawals",{userId:uid,amount:saldoDisponivel,pixKey,status:"aguardando",date:today});
+            await fsUpdate("users",uid,{pixKey});
+            setShowWith(false);
+          }} color="linear-gradient(135deg,#34D399,#059669)" t={t} disabled={!pixKey.trim()}>
+            Confirmar Saque
+          </PBtn>
+        </Modal>
+      )}
+
+      {showPlans&&(
+        <Modal onClose={()=>{setShowPlans(false);setShowPix(false);}} t={t}>
+          {!showPix ? (
+            <>
+              <div style={{fontSize:18,fontWeight:800,marginBottom:4,color:t.text}}>Planos</div>
+              <div style={{fontSize:12,color:t.sub,marginBottom:20}}>Toque no Premium para assinar</div>
+
+              {/* FREE CARD */}
+              <div style={{background:user.plan==="free"?`#6B728012`:t.inputBg,border:`2px solid ${user.plan==="free"?"#6B7280":t.border}`,borderRadius:16,padding:16,marginBottom:10,position:"relative"}}>
+                {user.plan==="free"&&<div style={{position:"absolute",top:-9,left:12,background:"#34D399",color:"#000",fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:10}}>ATUAL</div>}
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                  <div style={{fontSize:16,fontWeight:800,color:"#6B7280"}}>Free</div>
+                  <div style={{fontSize:18,fontWeight:800,color:"#6B7280"}}>Grátis</div>
+                </div>
+                {["Até 5 publis/mês","Dashboard básico","Calendário","1 meta","Indicação ativa"].map(f=>(
+                  <div key={f} style={{fontSize:11,color:t.sub,marginBottom:4,display:"flex",gap:6}}><span style={{color:"#6B7280"}}>✓</span>{f}</div>
+                ))}
+              </div>
+
+              {/* PREMIUM CARD — clicável */}
+              <div onClick={()=>user.plan!=="premium"&&setShowPix(true)} className="s"
+                style={{background:user.plan==="premium"?`${t.accent}12`:t.accentSoft,border:`2px solid ${t.accent}`,borderRadius:16,padding:16,marginBottom:10,position:"relative",cursor:user.plan==="premium"?"default":"pointer"}}>
+                <div style={{position:"absolute",top:-9,right:12,background:t.accent,color:"#FFF",fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:10}}>MELHOR</div>
+                {user.plan==="premium"&&<div style={{position:"absolute",top:-9,left:12,background:"#34D399",color:"#000",fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:10}}>ATUAL</div>}
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                  <div style={{fontSize:16,fontWeight:800,color:t.accent}}>Premium ✦</div>
+                  <div style={{fontSize:18,fontWeight:800,color:t.accent}}>R$ 10/mês</div>
+                </div>
+                {["Publis ILIMITADAS","Dashboard completo","Metas avançadas","Notificações","Dicas diárias","Relatórios","Indicação ativa","Saque ativo"].map(f=>(
+                  <div key={f} style={{fontSize:11,color:t.sub,marginBottom:4,display:"flex",gap:6}}><span style={{color:t.accent}}>✓</span>{f}</div>
+                ))}
+                {user.plan!=="premium"&&(
+                  <div style={{marginTop:12,background:t.accent,borderRadius:10,padding:"10px",textAlign:"center",color:"#FFF",fontWeight:800,fontSize:13}}>
+                    👆 Toque para assinar — R$ 10/mês
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* PIX PAYMENT SCREEN */}
+              <button onClick={()=>setShowPix(false)} style={{background:"none",border:"none",color:t.sub,fontSize:13,cursor:"pointer",marginBottom:12,display:"flex",alignItems:"center",gap:4}}>← Voltar</button>
+              <div style={{fontSize:18,fontWeight:800,marginBottom:4,color:t.text}}>Assinar Premium</div>
+              <div style={{fontSize:12,color:t.sub,marginBottom:20}}>Pague via PIX e aguarde ativação em até 24h</div>
+
+              {/* PIX KEY with copy */}
+              <div style={{background:`linear-gradient(135deg,${t.accent}18,#6366F118)`,border:`2px solid ${t.accent}44`,borderRadius:16,padding:20,marginBottom:16}}>
+                <div style={{fontSize:12,fontWeight:800,color:t.accent,marginBottom:12}}>💳 CHAVE PIX — R$ 10,00</div>
+                <div style={{background:t.inputBg,borderRadius:12,padding:"14px 16px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                  <div>
+                    <div style={{fontSize:10,color:t.sub,marginBottom:4,fontWeight:700}}>CPF · Influence PRO</div>
+                    <div style={{fontSize:22,fontWeight:900,color:t.accent,letterSpacing:2}}>{PIX_KEY_OWNER}</div>
+                  </div>
+                  <button onClick={()=>{
+                    navigator.clipboard?.writeText(PIX_KEY_OWNER).catch(()=>{});
+                    setPixCopied(true);
+                    setTimeout(()=>setPixCopied(false),3000);
+                  }} className="s" style={{background:pixCopied?"#34D39918":t.accentSoft,color:pixCopied?"#34D399":t.accent,border:`1px solid ${pixCopied?"#34D39944":t.accent+"44"}`,borderRadius:10,padding:"10px 16px",fontWeight:800,fontSize:13,cursor:"pointer",flexShrink:0}}>
+                    {pixCopied?"✓ Copiado!":"📋 Copiar"}
+                  </button>
+                </div>
+                <div style={{fontSize:11,color:"#FBBF24",background:"#FBBF2410",border:"1px solid #FBBF2428",borderRadius:8,padding:"8px 12px"}}>
+                  ⏰ Após o pagamento, envie o comprovante. Ativação em até 24h.
+                </div>
+              </div>
+
+              <div style={{background:"#34D39910",border:"1px solid #34D39930",borderRadius:12,padding:12,marginBottom:16}}>
+                <div style={{fontSize:12,color:"#34D399",fontWeight:700,marginBottom:4}}>Como funciona:</div>
+                <div style={{fontSize:11,color:t.sub}}>1. Copie a chave PIX acima</div>
+                <div style={{fontSize:11,color:t.sub}}>2. Abra seu banco e faça o PIX de R$ 10,00</div>
+                <div style={{fontSize:11,color:t.sub}}>3. Envie o comprovante pelo suporte</div>
+                <div style={{fontSize:11,color:t.sub}}>4. Seu Premium será ativado em até 24h</div>
+              </div>
+
+              <PBtn onClick={async()=>{
+                await fsUpdate("users", uid, {planRequestedAt: new Date().toISOString()});
+                setShowPlans(false);
+                setShowPix(false);
+                alert("✅ Solicitação registrada!\n\nAssim que confirmarmos o pagamento, seu Premium será ativado.");
+              }} t={t}>Já fiz o PIX — Aguardar Ativação</PBtn>
+            </>
+          )}
+        </Modal>
+      )}
+
+      {showAddCal&&(
+        <AddCalModal t={t} onClose={()=>setShowAddCal(false)} date={selDateStr}
+          onSave={async item=>{await fsAdd("checklist",{...item,userId:uid});setShowAddCal(false);}}
+        />
+      )}
+
+      {(showCampanha||editingCampanha)&&(
+        <CampanhaModal t={t}
+          onClose={()=>{setShowCampanha(false);setEditingCampanha(null);}}
+          initial={editingCampanha}
+          onSave={async p=>{
+            if(editingCampanha){
+              await fsUpdate("publis",editingCampanha.id,p);
+            } else {
+              await fsAdd("publis",{...p,userId:uid});
+            }
+            setShowCampanha(false);setEditingCampanha(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ─── ADMIN PANEL ─── */
+function AdminPanel({t,themeToggle,theme,onLogout}) {
+  const [tab,setTab]           = useState("dashboard");
+  const [users,setUsers]       = useState([]);
+  const [publis,setPublis]     = useState([]);
+  const [withdrawals,setWithdrawals] = useState([]);
+  const [referrals,setReferrals]     = useState([]);
+  const [search,setSearch]     = useState("");
+  const [editUserId,setEditUserId]   = useState(null);
+  const [editFollowers,setEditFollowers] = useState("");
+  const [editName,setEditName] = useState("");
+  const [editHandle,setEditHandle] = useState("");
+  const [loadingData,setLoadingData] = useState(true);
+  const [fixing,setFixing]           = useState(false);
+  const [fixResult,setFixResult]     = useState("");
+
+  useEffect(()=>{
+    setLoadingData(true);
+    const unsubs = [];
+    unsubs.push(fsListenAll("users", data=>{setUsers(data);setLoadingData(false);}));
+    unsubs.push(fsListenAll("publis", data=>setPublis(data)));
+    unsubs.push(fsListenAll("withdrawals", data=>setWithdrawals(data)));
+    unsubs.push(fsListenAll("referrals", data=>setReferrals(data)));
+    return ()=>unsubs.forEach(u=>u());
+  },[]);
+
+  const premium   = users.filter(u=>u.plan==="premium");
+  const freeUsers = users.filter(u=>u.plan==="free");
+  const filtUsers = users.filter(u=>
+    u.name?.toLowerCase().includes(search.toLowerCase())||
+    u.username?.toLowerCase().includes(search.toLowerCase()));
+  const totalRevenue = publis.filter(p=>p.payment==="pago").reduce((a,b)=>a+b.value,0);
+
+  const startEditUser = (u) => {
+    setEditUserId(u.id);
+    setEditFollowers(u.followers?.toString()||"0");
+    setEditName(u.name||"");
+    setEditHandle(u.handle||"");
+  };
+
+  const saveEditUser = async (uid) => {
+    await fsUpdate("users", uid, {
+      followers: parseInt(editFollowers)||0,
+      name: editName,
+      handle: editHandle,
+    });
+    setEditUserId(null);
+  };
+
+  if(loadingData) return <Loading t={t}/>;
+
+  return (
+    <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",background:t.bg,minHeight:"100vh",maxWidth:430,margin:"0 auto",color:t.text}}>
+      <style>{makeCSS(t)}</style>
+      <div style={{background:t.navBg,padding:"16px 16px 0",position:"sticky",top:0,zIndex:50}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:38,height:38,borderRadius:"50%",background:"linear-gradient(135deg,#F87171,#EC4899)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:14,color:"#FFF"}}>AD</div>
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:t.text}}>Painel Admin</div>
+              <div style={{fontSize:11,color:"#F87171"}}>Acesso total · Tempo real</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={themeToggle} className="s" style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:14}}>{theme==="dark"?"☀️":"🌙"}</button>
+            <button onClick={onLogout} style={{background:"#F8717118",border:"1px solid #F8717130",color:"#F87171",borderRadius:8,padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Sair</button>
+          </div>
+        </div>
+        <div style={{display:"flex",borderBottom:`1px solid ${t.border}`}}>
+          {[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"assinaturas",icon:"💎",label:"Planos"},{id:"users",icon:"👥",label:"Usuários"},{id:"rede",icon:"🧬",label:"Rede"},{id:"pagamentos",icon:"💸",label:"Saques"}].map(n=>(
+            <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,padding:"8px 2px",background:"none",border:"none",borderBottom:`2px solid ${tab===n.id?"#F87171":"transparent"}`,color:tab===n.id?"#F87171":t.sub,cursor:"pointer",fontSize:10,fontWeight:800,display:"flex",flexDirection:"column",alignItems:"center",gap:2,transition:"all .2s",marginBottom:-1}}>
+              <span style={{fontSize:14}}>{n.icon}</span>{n.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{padding:"16px 16px 80px",overflowY:"auto",maxHeight:"calc(100vh - 120px)"}}>
+
+        {/* ADMIN DASHBOARD */}
+        {tab==="dashboard"&&(
+          <div className="fi">
+            <div style={{fontSize:20,fontWeight:800,marginBottom:4,color:t.text}}>Dashboard</div>
+            <div style={{fontSize:11,color:t.sub,marginBottom:16}}>Dados em tempo real do Firebase</div>
+            {(()=>{
+              const now = new Date();
+              const mesAtual = now.toISOString().substr(0,7);
+              const fatMes = premium.length * 10;
+              const totalSaquesPago = withdrawals.filter(w=>w.status==="pago").reduce((a,b)=>a+(b.amount||0),0);
+              const lucroReal = fatMes - totalSaquesPago;
+              return (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                  <Card t={t} style={{padding:"14px 16px"}}>
+                    <div style={{fontSize:10,color:t.sub,fontWeight:700,marginBottom:4}}>TOTAL USUÁRIOS</div>
+                    <div style={{fontSize:20,fontWeight:800,color:t.accent}}>{users.length}</div>
+                    <div style={{fontSize:10,color:t.sub,marginTop:2}}>cadastrados</div>
+                  </Card>
+                  <Card t={t} style={{padding:"14px 16px"}}>
+                    <div style={{fontSize:10,color:t.sub,fontWeight:700,marginBottom:4}}>PREMIUM ATIVOS</div>
+                    <div style={{fontSize:20,fontWeight:800,color:"#34D399"}}>{premium.length}</div>
+                    <div style={{fontSize:10,color:t.sub,marginTop:2}}>{users.length?Math.round(premium.length/users.length*100):0}% do total</div>
+                  </Card>
+                  <Card t={t} style={{padding:"14px 16px",background:"linear-gradient(135deg,rgba(124,106,247,.12),rgba(99,102,241,.06))"}}>
+                    <div style={{fontSize:10,color:t.sub,fontWeight:700,marginBottom:4}}>FATURAMENTO MÊS</div>
+                    <div style={{fontSize:20,fontWeight:800,color:t.accent}}>R$ {fatMes.toFixed(2)}</div>
+                    <div style={{fontSize:10,color:t.sub,marginTop:2}}>{premium.length} × R$10</div>
+                  </Card>
+                  <Card t={t} style={{padding:"14px 16px"}}>
+                    <div style={{fontSize:10,color:t.sub,fontWeight:700,marginBottom:4}}>TOTAL SAQUES PAGOS</div>
+                    <div style={{fontSize:20,fontWeight:800,color:"#F87171"}}>R$ {totalSaquesPago.toFixed(2)}</div>
+                    <div style={{fontSize:10,color:t.sub,marginTop:2}}>{withdrawals.filter(w=>w.status==="pago").length} saques</div>
+                  </Card>
+                  <Card t={t} style={{gridColumn:"1/-1",padding:"14px 16px",background:lucroReal>=0?"linear-gradient(135deg,rgba(52,211,153,.1),rgba(5,150,105,.05))":"linear-gradient(135deg,rgba(248,113,113,.1),rgba(239,68,68,.05))"}}>
+                    <div style={{fontSize:10,color:t.sub,fontWeight:700,marginBottom:4}}>LUCRO REAL DO MÊS</div>
+                    <div style={{fontSize:26,fontWeight:800,color:lucroReal>=0?"#34D399":"#F87171"}}>R$ {lucroReal.toFixed(2)}</div>
+                    <div style={{fontSize:10,color:t.sub,marginTop:2}}>Assinaturas − Saques pagos</div>
+                  </Card>
+                </div>
+              );
+            })()}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+              {[
+                {label:"Saques Pendentes",val:withdrawals.filter(w=>w.status==="aguardando").length,color:"#FBBF24"},
+                {label:"Saques Pagos",    val:withdrawals.filter(w=>w.status==="pago").length,       color:"#34D399"},
+                {label:"Total Indicações",val:referrals.length,                                      color:t.accent},
+              ].map(s=>(
+                <div key={s.label} style={{background:`${s.color}0C`,border:`1px solid ${s.color}28`,borderRadius:12,padding:12,textAlign:"center"}}>
+                  <div style={{fontSize:22,fontWeight:800,color:s.color}}>{s.val}</div>
+                  <div style={{fontSize:9,color:t.sub,marginTop:2}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            <Card t={t} style={{marginBottom:14}}>
+              <SecTitle t={t}>PLANOS</SecTitle>
+              <div style={{marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                  <span style={{fontSize:12,color:t.text,fontWeight:600}}>Premium ({premium.length})</span>
+                  <span style={{fontSize:12,color:"#34D399",fontWeight:700}}>R$ {(premium.length*10).toFixed(2)}/mês</span>
+                </div>
+                <PBar value={premium.length} max={Math.max(users.length,1)} color="#34D399" t={t}/>
+              </div>
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                  <span style={{fontSize:12,color:t.text,fontWeight:600}}>Free ({freeUsers.length})</span>
+                </div>
+                <PBar value={freeUsers.length} max={Math.max(users.length,1)} color="#FBBF24" t={t}/>
+              </div>
+            </Card>
+            <Card t={t} style={{marginBottom:14}}>
+              <SecTitle t={t}>SAQUES AGUARDANDO</SecTitle>
+              {withdrawals.filter(w=>w.status==="aguardando").length===0
+                ?<div style={{fontSize:12,color:t.sub,textAlign:"center",padding:12}}>Nenhum saque pendente ✓</div>
+                :withdrawals.filter(w=>w.status==="aguardando").map(w=>{
+                  const u=users.find(x=>x.id===w.userId||x.uid===w.userId);
+                  return (
+                    <div key={w.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${t.border}`}}>
+                      <div><div style={{fontSize:13,fontWeight:700,color:t.text}}>{u?.name||"—"}</div><div style={{fontSize:11,color:t.sub}}>PIX: {w.pixKey||"—"}</div></div>
+                      <div style={{textAlign:"right"}}><div style={{fontSize:15,fontWeight:800,color:"#34D399"}}>R$ {w.amount?.toFixed(2)}</div><Pill label="⏳ Aguardando" color="#FBBF24"/></div>
+                    </div>
+                  );
+                })}
+            </Card>
+            <SecTitle t={t}>ÚLTIMOS CADASTROS</SecTitle>
+            {[...users].sort((a,b)=>(b.joinDate||"").localeCompare(a.joinDate||"")).slice(0,5).map(u=>(
+              <div key={u.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${t.border}`}}>
+                <Av initials={u.avatar} size={34} t={t}/>
+                <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:t.text}}>{u.name}</div><div style={{fontSize:10,color:t.sub}}>{u.joinDate}</div></div>
+                <Pill label={u.plan==="premium"?"✦ Premium":"Free"} color={u.plan==="premium"?t.accent:"#6B7280"}/>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ADMIN ASSINATURAS */}
+        {tab==="assinaturas"&&(
+          <div className="fi">
+            <div style={{fontSize:20,fontWeight:800,marginBottom:4,color:t.text}}>Controle de Planos</div>
+            <div style={{fontSize:11,color:t.sub,marginBottom:16}}>Ative o Premium após confirmação do pagamento</div>
+
+            {/* Pendentes de ativação */}
+            {users.filter(u=>u.planRequestedAt&&u.plan==="free").length>0&&(
+              <div style={{background:"#FBBF2410",border:"1px solid #FBBF2430",borderRadius:14,padding:14,marginBottom:16}}>
+                <div style={{fontSize:12,fontWeight:800,color:"#FBBF24",marginBottom:10}}>⏳ AGUARDANDO ATIVAÇÃO</div>
+                {users.filter(u=>u.planRequestedAt&&u.plan==="free").map(u=>(
+                  <div key={u.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid #FBBF2420`}}>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:t.text}}>{u.name}</div>
+                      <div style={{fontSize:10,color:t.sub}}>Solicitou em: {u.planRequestedAt?.substr(0,10)||"—"}</div>
+                    </div>
+                    <button onClick={async()=>{
+                      const expiry = new Date(); expiry.setDate(expiry.getDate()+30);
+                      await fsUpdate("users",u.id,{plan:"premium",planExpiry:expiry.toISOString().substr(0,10),planActivatedAt:new Date().toISOString().substr(0,10)});
+                    }} style={{background:"linear-gradient(135deg,#34D399,#059669)",border:"none",borderRadius:8,padding:"6px 14px",color:"#FFF",fontWeight:800,fontSize:12,cursor:"pointer"}}>
+                      ✅ Ativar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Todos os usuários com plano */}
+            <SecTitle t={t}>TODOS OS PLANOS</SecTitle>
+            {users.map(u=>{
+              const expiry = u.planExpiry;
+              const today2 = new Date().toISOString().substr(0,10);
+              const diasRestantes = expiry ? Math.ceil((new Date(expiry)-new Date())/86400000) : null;
+              const vencido = expiry && expiry < today2;
+              const venceEm7 = diasRestantes !== null && diasRestantes <= 7 && diasRestantes > 0;
+              return (
+                <Card key={u.id} t={t} style={{marginBottom:10,border:`1px solid ${vencido?"#F8717144":venceEm7?"#FBBF2444":t.border}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <Av initials={u.avatar} size={38} t={t}/>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:t.text}}>{u.name}</div>
+                        <div style={{fontSize:10,color:t.sub}}>@{u.username}</div>
+                      </div>
+                    </div>
+                    <Pill label={u.plan==="premium"?"✦ Premium":"Free"} color={u.plan==="premium"?t.accent:"#6B7280"}/>
+                  </div>
+                  {u.plan==="premium"&&(
+                    <div style={{background:vencido?"#F8717110":venceEm7?"#FBBF2410":t.inputBg,borderRadius:10,padding:"8px 12px",marginBottom:10}}>
+                      <div style={{fontSize:11,color:vencido?"#F87171":venceEm7?"#FBBF24":"#34D399",fontWeight:700}}>
+                        {vencido?"⚠ VENCIDO":"✓ Ativo"} · {expiry||"sem data"}
+                      </div>
+                      {diasRestantes!==null&&!vencido&&<div style={{fontSize:10,color:t.sub}}>{diasRestantes} dias restantes</div>}
+                      {vencido&&<div style={{fontSize:10,color:"#F87171"}}>Plano expirado — renew necessário</div>}
+                    </div>
+                  )}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    {u.plan==="free"?(
+                      <button onClick={async()=>{
+                        const expiry = new Date(); expiry.setDate(expiry.getDate()+30);
+                        await fsUpdate("users",u.id,{plan:"premium",planExpiry:expiry.toISOString().substr(0,10),planActivatedAt:new Date().toISOString().substr(0,10)});
+                      }} style={{gridColumn:"1/-1",background:"linear-gradient(135deg,#34D399,#059669)",border:"none",borderRadius:8,padding:"8px",color:"#FFF",fontWeight:800,fontSize:12,cursor:"pointer"}}>
+                        ⬆ Ativar Premium (30 dias)
+                      </button>
+                    ):(
+                      <>
+                        <button onClick={async()=>{
+                          const newExpiry = new Date(u.planExpiry||new Date()); newExpiry.setDate(newExpiry.getDate()+30);
+                          await fsUpdate("users",u.id,{planExpiry:newExpiry.toISOString().substr(0,10)});
+                        }} style={{background:`${t.accent}18`,border:`1px solid ${t.accent}44`,borderRadius:8,padding:"7px",color:t.accent,fontWeight:700,fontSize:11,cursor:"pointer"}}>
+                          +30 dias
+                        </button>
+                        <button onClick={async()=>{
+                          if(confirm("Rebaixar para Free?")) await fsUpdate("users",u.id,{plan:"free",planExpiry:null});
+                        }} style={{background:"#F8717114",border:"1px solid #F8717130",borderRadius:8,padding:"7px",color:"#F87171",fontWeight:700,fontSize:11,cursor:"pointer"}}>
+                          ⬇ Free
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ADMIN USERS */}
+        {tab==="users"&&(
+          <div className="fi">
+            <div style={{fontSize:20,fontWeight:800,marginBottom:4,color:t.text}}>Cadastros</div>
+            <div style={{fontSize:11,color:t.sub,marginBottom:16}}>{users.length} usuários — dados em tempo real</div>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nome ou usuário..."
+              style={{width:"100%",background:t.inputBg,border:`1px solid ${t.inputBorder}`,borderRadius:10,padding:"12px 14px",fontSize:14,color:t.text,marginBottom:16,outline:"none"}}/>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
+              {[{label:"Total",val:users.length,color:t.accent},{label:"Premium",val:premium.length,color:"#34D399"},{label:"Free",val:freeUsers.length,color:"#FBBF24"}].map(s=>(
+                <div key={s.label} style={{background:`${s.color}0C`,border:`1px solid ${s.color}28`,borderRadius:12,padding:12,textAlign:"center"}}>
+                  <div style={{fontSize:24,fontWeight:800,color:s.color}}>{s.val}</div>
+                  <div style={{fontSize:10,color:t.sub}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            {filtUsers.map(u=>(
+              <Card key={u.id} t={t} style={{marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+                  <Av initials={u.avatar} size={42} t={t}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:14,fontWeight:700,color:t.text}}>{u.name}</div>
+                    <div style={{fontSize:11,color:t.sub}}>@{u.username} · {u.id?.substr(0,8)}</div>
+                    <div style={{fontSize:11,color:t.sub}}>Desde: {u.joinDate}</div>
+                  </div>
+                  <Pill label={u.plan==="premium"?"✦ Premium":"Free"} color={u.plan==="premium"?t.accent:"#6B7280"}/>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
+                  {[
+                    {label:"Seguidores",   val:(u.followers||0).toLocaleString("pt-BR")},
+                    {label:"Indicações",   val:referrals.filter(r=>r.referrerId===u.id||r.referrerId===u.uid).length},
+                    {label:"Ref. ID",      val:u.referralId||"—"},
+                    {label:"Referido por", val:u.referredBy?users.find(x=>x.id===u.referredBy)?.name||"—":"—"},
+                  ].map(s=>(
+                    <div key={s.label} style={{background:t.inputBg,borderRadius:8,padding:"8px 10px"}}>
+                      <div style={{fontSize:9,color:t.sub,marginBottom:2}}>{s.label.toUpperCase()}</div>
+                      <div style={{fontSize:12,fontWeight:700,color:t.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.val}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Editar perfil e seguidores */}
+                {editUserId===u.id?(
+                  <div style={{borderTop:`1px solid ${t.border}`,paddingTop:12}}>
+                    <div style={{fontSize:10,fontWeight:800,color:t.sub,marginBottom:10}}>EDITAR PERFIL</div>
+                    <div style={{marginBottom:8}}>
+                      <label style={{fontSize:10,color:t.sub,fontWeight:700,display:"block",marginBottom:4}}>NOME</label>
+                      <input value={editName} onChange={e=>setEditName(e.target.value)}
+                        style={{width:"100%",background:t.inputBg,border:`1px solid ${t.inputBorder}`,borderRadius:8,padding:"8px 12px",fontSize:14,color:t.text,outline:"none"}}/>
+                    </div>
+                    <div style={{marginBottom:8}}>
+                      <label style={{fontSize:10,color:t.sub,fontWeight:700,display:"block",marginBottom:4}}>@ HANDLE</label>
+                      <input value={editHandle} onChange={e=>setEditHandle(e.target.value)}
+                        style={{width:"100%",background:t.inputBg,border:`1px solid ${t.inputBorder}`,borderRadius:8,padding:"8px 12px",fontSize:14,color:t.text,outline:"none"}}/>
+                    </div>
+                    <div style={{marginBottom:10}}>
+                      <label style={{fontSize:10,color:t.sub,fontWeight:700,display:"block",marginBottom:4}}>SEGUIDORES</label>
+                      <input value={editFollowers} onChange={e=>setEditFollowers(e.target.value)} type="number"
+                        style={{width:"100%",background:t.inputBg,border:`1px solid ${t.inputBorder}`,borderRadius:8,padding:"8px 12px",fontSize:14,color:"#34D399",fontWeight:700,outline:"none"}}/>
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>saveEditUser(u.id||u.uid)} style={{flex:1,background:`linear-gradient(135deg,${t.accent},#6366F1)`,border:"none",borderRadius:8,padding:"8px",color:"#FFF",fontWeight:700,fontSize:12,cursor:"pointer"}}>✓ Salvar no Firebase</button>
+                      <button onClick={()=>setEditUserId(null)} style={{background:t.inputBg,border:`1px solid ${t.border}`,borderRadius:8,padding:"8px 12px",color:t.sub,cursor:"pointer",fontSize:12}}>✕</button>
+                    </div>
+                  </div>
+                ):(
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    <button onClick={()=>startEditUser(u)} className="s"
+                      style={{background:t.accentSoft,border:`1px solid ${t.accent}44`,color:t.accent,borderRadius:8,padding:"7px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                      ✏️ Editar perfil
+                    </button>
+                    <button onClick={async()=>{
+                      const newPlan = u.plan==="premium"?"free":"premium";
+                      await fsUpdate("users",u.id||u.uid,{plan:newPlan});
+                    }} className="s"
+                      style={{background:u.plan==="premium"?"#F8717114":"#34D39914",border:`1px solid ${u.plan==="premium"?"#F8717130":"#34D39930"}`,color:u.plan==="premium"?"#F87171":"#34D399",borderRadius:8,padding:"7px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                      {u.plan==="premium"?"⬇ Free":"⬆ Premium"}
+                    </button>
+                  </div>
+                )}
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* ADMIN REDE */}
+        {tab==="rede"&&(
+          <div className="fi">
+            <div style={{fontSize:20,fontWeight:800,marginBottom:4,color:t.text}}>Rede de Indicações</div>
+            <div style={{fontSize:11,color:t.sub,marginBottom:16}}>Estrutura completa em tempo real</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
+              {[
+                {label:"Nível 1",val:referrals.filter(r=>r.level===1).length,color:t.accent},
+                {label:"Nível 2",val:referrals.filter(r=>r.level===2).length,color:"#6366F1"},
+                {label:"Nível 3",val:referrals.filter(r=>r.level===3).length,color:"#60A5FA"},
+              ].map(s=>(
+                <div key={s.label} style={{background:`${s.color}0C`,border:`1px solid ${s.color}28`,borderRadius:12,padding:12,textAlign:"center"}}>
+                  <div style={{fontSize:22,fontWeight:800,color:s.color}}>{s.val}</div>
+                  <div style={{fontSize:10,color:t.sub}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            <SecTitle t={t}>COMISSÕES POR USUÁRIO</SecTitle>
+            {users.map(u=>{
+              const userRefs = referrals.filter(r=>r.referrerId===u.id||r.referrerId===u.uid);
+              if(!userRefs.length) return null;
+              const total = userRefs.reduce((a,r)=>a+r.commission,0);
+              return (
+                <Card key={u.id} t={t} style={{marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <Av initials={u.avatar} size={34} t={t}/>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:t.text}}>{u.name}</div>
+                        <div style={{fontSize:10,color:t.sub}}>{userRefs.length} na rede</div>
+                      </div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:16,fontWeight:800,color:"#34D399"}}>R$ {total.toFixed(2)}</div>
+                      <div style={{fontSize:9,color:t.sub}}>/mês</div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6}}>
+                    {[{l:"L1",c:t.accent},{l:"L2",c:"#6366F1"},{l:"L3",c:"#60A5FA"}].map((lv,i)=>(
+                      <div key={lv.l} style={{flex:1,background:`${lv.c}10`,border:`1px solid ${lv.c}28`,borderRadius:8,padding:"6px",textAlign:"center"}}>
+                        <div style={{fontSize:16,fontWeight:800,color:lv.c}}>{userRefs.filter(r=>r.level===i+1).length}</div>
+                        <div style={{fontSize:9,color:t.sub}}>{lv.l}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{marginTop:10}}>
+                    {userRefs.map(r=>(
+                      <div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:`1px solid ${t.border}`,fontSize:11}}>
+                        <span style={{color:t.sub}}>L{r.level} · {r.referredName}</span>
+                        <span style={{color:r.commission>0?"#34D399":t.sub,fontWeight:700}}>{r.commission>0?`+R$ ${r.commission.toFixed(2)}`:"Free"}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              );
+            })}
+            {referrals.length===0&&<div style={{textAlign:"center",padding:32,color:t.sub,fontSize:13}}>Nenhuma indicação ainda.</div>}
+          </div>
+        )}
+
+        {/* ADMIN PAGAMENTOS */}
+        {tab==="pagamentos"&&(
+          <div className="fi">
+            <div style={{fontSize:20,fontWeight:800,marginBottom:4,color:t.text}}>Saques</div>
+            <div style={{fontSize:11,color:t.sub,marginBottom:16}}>{withdrawals.length} solicitações — tempo real</div>
+
+            {/* FERRAMENTA DE CORREÇÃO */}
+            <Card t={t} style={{marginBottom:16,border:`1px solid ${t.accent}33`,background:t.accentSoft}}>
+              <div style={{fontSize:12,fontWeight:800,color:t.accent,marginBottom:8}}>🔧 Corrigir userId dos saques</div>
+              <div style={{fontSize:11,color:t.sub,marginBottom:12,lineHeight:1.6}}>
+                Saques antigos podem ter userId incorreto. Esta ferramenta vincula automaticamente cada saque ao usuário correto pelo e-mail/PIX.
+              </div>
+              {fixResult&&(
+                <div style={{background:"#34D39914",border:"1px solid #34D39930",borderRadius:8,padding:"8px 12px",marginBottom:10,fontSize:11,color:"#34D399",fontWeight:600}}>
+                  {fixResult}
+                </div>
+              )}
+              <button onClick={async()=>{
+                setFixing(true);
+                setFixResult("");
+                let fixed = 0;
+                let errors = 0;
+                try {
+                  for(const w of withdrawals){
+                    // Já tem userId válido que bate com algum usuário?
+                    const matchDirect = users.find(u=>(u.id===w.userId||u.uid===w.userId));
+                    if(matchDirect) continue; // OK, pula
+
+                    // Tentar achar pelo pixKey
+                    let foundUser = null;
+                    if(w.pixKey){
+                      foundUser = users.find(u=>
+                        u.pixKey===w.pixKey ||
+                        u.email===w.pixKey ||
+                        u.cpf===w.pixKey
+                      );
+                    }
+                    // Tentar achar pelo username no userId
+                    if(!foundUser && w.userId){
+                      foundUser = users.find(u=>
+                        u.username===w.userId ||
+                        u.handle===w.userId ||
+                        u.name===w.userId
+                      );
+                    }
+
+                    if(foundUser){
+                      const correctId = foundUser.id||foundUser.uid;
+                      await fsUpdate("withdrawals", w.id, {userId: correctId});
+                      fixed++;
+                    } else {
+                      errors++;
+                    }
+                  }
+                  setFixResult(`✅ ${fixed} saque(s) corrigido(s). ${errors>0?`⚠️ ${errors} não identificado(s) — vincule manualmente.`:""}`);
+                } catch(e){
+                  setFixResult("❌ Erro: " + e.message);
+                }
+                setFixing(false);
+              }} className="s" disabled={fixing}
+                style={{width:"100%",background:`linear-gradient(135deg,${t.accent},#6366F1)`,border:"none",borderRadius:10,padding:"10px",color:"#FFF",fontWeight:700,fontSize:13,cursor:fixing?"not-allowed":"pointer",opacity:fixing?0.6:1}}>
+                {fixing?"🔄 Corrigindo...":"🔧 Corrigir Agora"}
+              </button>
+
+              {/* Vincular manualmente */}
+              <div style={{borderTop:`1px solid ${t.border}`,marginTop:14,paddingTop:14}}>
+                <div style={{fontSize:11,fontWeight:800,color:t.sub,marginBottom:10}}>VINCULAR SAQUE MANUALMENTE</div>
+                {withdrawals.filter(w=>!users.find(u=>u.id===w.userId||u.uid===w.userId)).map(w=>(
+                  <div key={w.id} style={{background:t.inputBg,borderRadius:10,padding:12,marginBottom:8}}>
+                    <div style={{fontSize:12,color:"#F87171",fontWeight:700,marginBottom:6}}>
+                      ⚠ Saque sem dono · R$ {w.amount?.toFixed(2)} · PIX: {w.pixKey||"—"}
+                    </div>
+                    <div style={{fontSize:10,color:t.sub,marginBottom:8}}>ID salvo: {w.userId||"vazio"}</div>
+                    <select onChange={async(e)=>{
+                      if(!e.target.value) return;
+                      await fsUpdate("withdrawals",w.id,{userId:e.target.value});
+                      setFixResult("✅ Saque vinculado com sucesso!");
+                    }} style={{width:"100%",background:t.surface,border:`1px solid ${t.border}`,borderRadius:8,padding:"8px 10px",color:t.text,fontSize:12,outline:"none"}}>
+                      <option value="">— Selecionar usuário —</option>
+                      {users.map(u=>(
+                        <option key={u.id||u.uid} value={u.id||u.uid}>
+                          {u.name} (@{u.username}) · {u.pixKey||u.email||"sem PIX"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+                {withdrawals.filter(w=>!users.find(u=>u.id===w.userId||u.uid===w.userId)).length===0&&(
+                  <div style={{fontSize:11,color:"#34D399",textAlign:"center"}}>✓ Todos os saques estão vinculados corretamente</div>
+                )}
+              </div>
+            </Card>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+              {[{label:"Aguardando",val:withdrawals.filter(w=>w.status==="aguardando").length,color:"#FBBF24"},{label:"Pagos",val:withdrawals.filter(w=>w.status==="pago").length,color:"#34D399"}].map(s=>(
+                <div key={s.label} style={{background:`${s.color}0C`,border:`1px solid ${s.color}28`,borderRadius:12,padding:12,textAlign:"center"}}>
+                  <div style={{fontSize:28,fontWeight:800,color:s.color}}>{s.val}</div>
+                  <div style={{fontSize:11,color:t.sub}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            {withdrawals.length===0&&<div style={{textAlign:"center",padding:32,color:t.sub,fontSize:13}}>Nenhuma solicitação ainda.</div>}
+            {withdrawals.map(w=>{
+              const u=users.find(x=>x.id===w.userId||x.uid===w.userId);
+              return (
+                <Card key={w.id} t={t} style={{marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+                    <div>
+                      <div style={{fontSize:14,fontWeight:700,color:t.text}}>{u?.name||"Usuário"}</div>
+                      <div style={{fontSize:11,color:t.sub}}>@{u?.username} · {w.date}</div>
+                      <div style={{fontSize:11,color:t.sub,marginTop:2}}>PIX: <span style={{color:t.text,fontWeight:600}}>{w.pixKey||"—"}</span></div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:22,fontWeight:800,color:"#34D399"}}>R$ {w.amount?.toFixed(2)}</div>
+                      <Pill label={w.status==="pago"?"✅ Pago":"⏳ Aguardando"} color={w.status==="pago"?"#34D399":"#FBBF24"}/>
+                    </div>
+                  </div>
+                  <div style={{background:"#FBBF2410",border:"1px solid #FBBF2430",borderRadius:8,padding:"8px 12px",marginBottom:10}}>
+                    <div style={{fontSize:11,color:"#FBBF24",fontWeight:600}}>⏰ Pagamentos até às 18h do dia do saque.</div>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    <button onClick={async()=>{
+                        if(w.status==="aguardando"){
+                          // Marcar como pago e registrar data
+                          await fsUpdate("withdrawals",w.id,{status:"pago",paidAt:new Date().toISOString().substr(0,10)});
+                          // Atualizar totalEarnings do usuário para refletir débito
+                          const userDoc = users.find(x=>x.id===w.userId||x.uid===w.userId);
+                          if(userDoc){
+                            const uid2 = userDoc.id||userDoc.uid;
+                            await fsUpdate("users",uid2,{lastWithdrawal:new Date().toISOString().substr(0,10)});
+                          }
+                        }
+                      }}
+                      disabled={w.status==="pago"}
+                      style={{gridColumn:"1/-1",padding:"10px 0",borderRadius:10,border:`2px solid ${w.status==="pago"?"#34D39944":t.border}`,background:w.status==="pago"?"#34D39914":t.accentSoft,color:w.status==="pago"?"#34D399":t.accent,fontWeight:800,fontSize:13,cursor:w.status==="pago"?"default":"pointer",opacity:w.status==="pago"?0.7:1}}>
+                      {w.status==="pago"?"✅ Pago em "+w.paidAt:"💳 Confirmar Pagamento"}
+                    </button>
+                    {w.status==="aguardando"&&(
+                      <button onClick={async()=>{
+                        if(confirm("Cancelar saque?")) await fsUpdate("withdrawals",w.id,{status:"cancelado"});
+                      }}
+                        style={{gridColumn:"1/-1",padding:"8px 0",borderRadius:10,border:"1px solid #F8717130",background:"#F8717108",color:"#F87171",fontWeight:700,fontSize:12,cursor:"pointer",marginTop:4}}>
+                        ✕ Cancelar Saque
+                      </button>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── ROOT ─── */
+function InfluencePRO() {
+  const [screen,setScreen] = useState("loading");
+  const [user,setUser]     = useState(null);
+  const [theme,setTheme]   = useState("dark");
+  const t      = THEMES[theme];
+  const toggle = () => setTheme(th=>{ const nv=th==="dark"?"light":"dark"; try{localStorage.setItem("ip_theme",nv);}catch(e){} return nv; });
+  const today  = new Date().toISOString().substr(0,10);
+
+  // Persiste sessão Firebase Auth + Admin via localStorage
+  useEffect(()=>{
+    // Check admin session first
+    try {
+      const adminSession = localStorage.getItem("ip_admin_session");
+      if(adminSession === "true"){
+        setUser({isAdmin:true,name:"Administrador",avatar:"AD",uid:"admin"});
+        setScreen("admin");
+        return;
+      }
+    } catch(e){}
+
+    const unsub = fbOnAuth(async fbUser => {
+      if(fbUser){
+        try {
+          const profile = await fsGet("users", fbUser.uid);
+          if(profile){
+            setUser(profile);
+            // Save theme preference
+            try{ const th=localStorage.getItem("ip_theme"); if(th) setTheme(th); }catch(e){}
+            setScreen("app");
+          } else {
+            setScreen("login");
+          }
+        } catch(e){
+          setScreen("login");
+        }
+      } else {
+        setScreen("login");
+      }
+    });
+    return ()=>unsub();
+  },[]);
+
+  const handleLogout = async () => {
+    try{localStorage.removeItem("ip_admin_session");}catch(e){}
+    await fbSignOut();
+    setUser(null);
+    setScreen("login");
+  };
+
+  if(screen==="loading") return <Loading t={t}/>;
+
+  return (
+    <div style={{background:t.bg,minHeight:"100vh"}}>
+      {screen==="login"    && <LoginScreen    onLogin={u=>{setUser(u);setScreen(u.isAdmin?"admin":"app");}} onGoRegister={()=>setScreen("register")} t={t} themeToggle={toggle} theme={theme}/>}
+      {screen==="register" && <RegisterScreen onBack={()=>setScreen("login")} onRegister={u=>{setUser(u);setScreen("app");}} t={t}/>}
+      {screen==="app"      && user && <MainApp user={user} t={t} themeToggle={toggle} theme={theme} onLogout={handleLogout}/>}
+      {screen==="admin"    && user && <AdminPanel t={t} themeToggle={toggle} theme={theme} onLogout={handleLogout}/>}
+    </div>
+  );
+}
+
+  // Mount app
+  const rootEl = ReactDOM.createRoot(document.getElementById('root'));
+  rootEl.render(React.createElement(InfluencePRO));
+</script>
+  <script>
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('./sw.js')
+        .then(()=>console.log('✅ SW registrado'))
+        .catch(e=>console.log('SW erro:',e));
+    }
+  </script>
+</body>
+</html>
