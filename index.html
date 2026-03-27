@@ -821,7 +821,7 @@ function MainApp({user,t,themeToggle,theme,onLogout}) {
     await fsUpdate("checklist", cid, {done:newDone});
   };
 
-  const NAV=[{id:"dashboard",icon:"⬡",label:"Home"},{id:"publis",icon:"◈",label:"Publis"},{id:"calendario",icon:"◷",label:"Agenda"},{id:"metas",icon:"◎",label:"Metas"},{id:"indicacao",icon:"⬟",label:"Rede"},{id:"divulgar",icon:"📣",label:"Divulgar",ext:true}];
+  const NAV=[{id:"dashboard",icon:"⬡",label:"Home"},{id:"publis",icon:"◈",label:"Publis"},{id:"calendario",icon:"◷",label:"Agenda"},{id:"metas",icon:"◎",label:"Metas"},{id:"indicacao",icon:"⬟",label:"Rede"}];
 
   if(loadingData) return <Loading t={t}/>;
 
@@ -848,7 +848,7 @@ function MainApp({user,t,themeToggle,theme,onLogout}) {
         </div>
         <div style={{display:"flex",borderBottom:`1px solid ${t.border}`}}>
           {NAV.map(n=>(
-            <button key={n.id} onClick={()=>n.ext?window.open("https://www.influpro.com.br/divulgar","_blank"):setTab(n.id)} style={{flex:1,padding:"8px 2px",background:"none",border:"none",borderBottom:`2px solid ${!n.ext&&tab===n.id?t.accent:"transparent"}`,color:n.ext?"#EC4899":tab===n.id?t.accent:t.sub,cursor:"pointer",fontSize:10,fontWeight:800,display:"flex",flexDirection:"column",alignItems:"center",gap:2,transition:"all .2s",marginBottom:-1}}>
+            <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,padding:"8px 2px",background:"none",border:"none",borderBottom:`2px solid ${tab===n.id?t.accent:"transparent"}`,color:tab===n.id?t.accent:t.sub,cursor:"pointer",fontSize:10,fontWeight:800,display:"flex",flexDirection:"column",alignItems:"center",gap:2,transition:"all .2s",marginBottom:-1}}>
               <span style={{fontSize:15}}>{n.icon}</span>{n.label}
             </button>
           ))}
@@ -1653,8 +1653,8 @@ function AdminPanel({t,themeToggle,theme,onLogout}) {
           </div>
         </div>
         <div style={{display:"flex",borderBottom:`1px solid ${t.border}`}}>
-          {[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"assinaturas",icon:"💎",label:"Planos"},{id:"users",icon:"👥",label:"Usuários"},{id:"divulgar_adm",icon:"📣",label:"Divulgar"},{id:"pagamentos",icon:"💸",label:"Saques"}].map(n=>(
-            <button key={n.id} onClick={()=>n.id==="divulgar_adm"?window.open("https://www.influpro.com.br/admin-divulgar","_blank"):setTab(n.id)} style={{flex:1,padding:"8px 2px",background:"none",border:"none",borderBottom:`2px solid ${tab===n.id?"#F87171":"transparent"}`,color:tab===n.id?"#F87171":t.sub,cursor:"pointer",fontSize:10,fontWeight:800,display:"flex",flexDirection:"column",alignItems:"center",gap:2,transition:"all .2s",marginBottom:-1}}>
+          {[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"assinaturas",icon:"💎",label:"Planos"},{id:"users",icon:"👥",label:"Usuários"},{id:"rede",icon:"🧬",label:"Rede"},{id:"pagamentos",icon:"💸",label:"Saques"}].map(n=>(
+            <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,padding:"8px 2px",background:"none",border:"none",borderBottom:`2px solid ${tab===n.id?"#F87171":"transparent"}`,color:tab===n.id?"#F87171":t.sub,cursor:"pointer",fontSize:10,fontWeight:800,display:"flex",flexDirection:"column",alignItems:"center",gap:2,transition:"all .2s",marginBottom:-1}}>
               <span style={{fontSize:14}}>{n.icon}</span>{n.label}
             </button>
           ))}
@@ -1849,7 +1849,58 @@ function AdminPanel({t,themeToggle,theme,onLogout}) {
             <div style={{fontSize:20,fontWeight:800,marginBottom:4,color:t.text}}>Cadastros</div>
             <div style={{fontSize:11,color:t.sub,marginBottom:16}}>{users.length} usuários — dados em tempo real</div>
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nome ou usuário..."
-              style={{width:"100%",background:t.inputBg,border:`1px solid ${t.inputBorder}`,borderRadius:10,padding:"12px 14px",fontSize:14,color:t.text,marginBottom:16,outline:"none"}}/>
+              style={{width:"100%",background:t.inputBg,border:`1px solid ${t.inputBorder}`,borderRadius:10,padding:"12px 14px",fontSize:14,color:t.text,marginBottom:10,outline:"none"}}/>
+            <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:2}}>
+              {[{l:"Todos",f:"todos"},{l:"🎯 Candidatos Premium",f:"candidatos"},{l:"😴 Premium inativos",f:"inativos"},{l:"⭐ Mais ativos",f:"ativos"},{l:"⚠️ Com atrasos",f:"atrasos"}].map(btn=>(
+                <button key={btn.f} onClick={()=>setSalesFilter&&setSalesFilter(btn.f)} className="s"
+                  style={{flexShrink:0,padding:"5px 12px",borderRadius:20,border:`1px solid ${t.border}`,background:t.surface,color:t.sub,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+                  {btn.l}
+                </button>
+              ))}
+            </div>
+            {/* ── PAINEL DE VENDAS ── */}
+            {(()=>{
+              const hoje = new Date().toISOString().substr(0,7);
+              const totalPubs = publis.length;
+              const pubsMes   = publis.filter(p=>p.delivery&&p.delivery.substr(0,7)===hoje).length;
+              const fatTotal  = publis.filter(p=>p.payment==="pago").reduce((a,b)=>a+(b.value||0),0);
+              const usersAtivos = users.filter(u=>{
+                const uid = u.id||u.uid;
+                return publis.some(p=>p.userId===uid && p.delivery&&p.delivery.substr(0,7)===hoje);
+              }).length;
+              const candidPrem = users.filter(u=>u.plan!=="premium" && publis.filter(p=>p.userId===(u.id||u.uid)).length>=3).length;
+              const inativosPrem = users.filter(u=>u.plan==="premium" && !publis.some(p=>p.userId===(u.id||u.uid)&&p.delivery&&p.delivery.substr(0,7)===hoje)).length;
+              return (
+                <div style={{background:`${t.accent}08`,border:`1px solid ${t.accent}22`,borderRadius:14,padding:14,marginBottom:14}}>
+                  <div style={{fontSize:11,fontWeight:800,color:t.accent,letterSpacing:1,marginBottom:10}}>📊 PAINEL DE VENDAS — VISÃO GERAL</div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:8}}>
+                    {[
+                      {l:"Ativos este mês",v:usersAtivos,c:"#34D399"},
+                      {l:"Candidatos Premium",v:candidPrem,c:t.accent},
+                      {l:"Premium inativos",v:inativosPrem,c:"#F87171"},
+                    ].map(s=>(
+                      <div key={s.l} style={{background:`${s.c}0C`,border:`1px solid ${s.c}28`,borderRadius:10,padding:"10px 4px",textAlign:"center"}}>
+                        <div style={{fontSize:20,fontWeight:800,color:s.c}}>{s.v}</div>
+                        <div style={{fontSize:9,color:t.sub,marginTop:2}}>{s.l}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+                    {[
+                      {l:"Total publis",v:totalPubs,c:"#A78BFA"},
+                      {l:"Publis este mês",v:pubsMes,c:"#FBBF24"},
+                      {l:"Faturamento geral",v:`R$${(fatTotal/1000).toFixed(1)}k`,c:"#34D399"},
+                    ].map(s=>(
+                      <div key={s.l} style={{background:`${s.c}0C`,border:`1px solid ${s.c}28`,borderRadius:10,padding:"10px 4px",textAlign:"center"}}>
+                        <div style={{fontSize:18,fontWeight:800,color:s.c}}>{s.v}</div>
+                        <div style={{fontSize:9,color:t.sub,marginTop:2}}>{s.l}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
               {[{label:"Total",val:users.length,color:t.accent},{label:"Premium",val:premium.length,color:"#34D399"},{label:"Free",val:freeUsers.length,color:"#FBBF24"}].map(s=>(
                 <div key={s.label} style={{background:`${s.color}0C`,border:`1px solid ${s.color}28`,borderRadius:12,padding:12,textAlign:"center"}}>
@@ -1869,12 +1920,140 @@ function AdminPanel({t,themeToggle,theme,onLogout}) {
                   </div>
                   <Pill label={u.plan==="premium"?"✦ Premium":"Free"} color={u.plan==="premium"?t.accent:"#6B7280"}/>
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
+                {/* ── ATIVIDADE DO USUÁRIO ── */}
+                {(()=>{
+                  const uId      = u.id||u.uid;
+                  const uPublis  = publis.filter(p=>p.userId===uId);
+                  const uWths    = withdrawals.filter(w=>w.userId===uId);
+                  const today3   = new Date().toISOString().substr(0,10);
+                  const mes      = today3.substr(0,7);
+                  const uPubMes  = uPublis.filter(p=>p.delivery&&p.delivery.substr(0,7)===mes);
+                  const uFat     = uPublis.filter(p=>p.payment==="pago").reduce((a,b)=>a+(b.value||0),0);
+                  const uFatMes  = uPubMes.filter(p=>p.payment==="pago").reduce((a,b)=>a+(b.value||0),0);
+                  const uAtras   = uPublis.filter(p=>p.status==="atrasado").length;
+                  const uPostado = uPublis.filter(p=>p.status==="postado").length;
+                  const uPend    = uPublis.filter(p=>p.status==="pendente").length;
+                  const uCamp    = uPublis.filter(p=>p.type==="campanha").length;
+                  const uPerm    = uPublis.filter(p=>p.payment==="permuta").length;
+                  const uPago    = uPublis.filter(p=>p.payment==="pago").length;
+                  const uSacado  = uWths.filter(w=>w.status==="pago").reduce((a,b)=>a+(b.amount||0),0);
+                  const uRefs    = referrals.filter(r=>r.referrerId===uId).length;
+                  const lastPub  = uPublis.length>0 ? [...uPublis].sort((a,b)=>(b.delivery||"").localeCompare(a.delivery||""))[0]?.delivery : null;
+                  // Engagement score (0-100)
+                  const score = Math.min(100, Math.round(
+                    (uPublis.length * 3) +
+                    (uPostado * 2) +
+                    (uFat/50) +
+                    (uRefs * 5) -
+                    (uAtras * 4)
+                  ));
+                  const scoreColor = score>=70?"#34D399":score>=40?"#FBBF24":"#F87171";
+                  const scoreLabel = score>=70?"Alto":score>=40?"Médio":"Baixo";
+
+                  return (
+                    <div>
+                      {/* Score de atividade */}
+                      <div style={{background:`${scoreColor}10`,border:`1px solid ${scoreColor}30`,borderRadius:12,padding:"10px 14px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div>
+                          <div style={{fontSize:11,fontWeight:800,color:scoreColor,letterSpacing:1}}>SCORE DE ATIVIDADE</div>
+                          <div style={{fontSize:11,color:t.sub,marginTop:2}}>Base: publis, ganhos e indicações</div>
+                        </div>
+                        <div style={{textAlign:"right"}}>
+                          <div style={{fontSize:28,fontWeight:800,color:scoreColor}}>{score}</div>
+                          <div style={{fontSize:10,fontWeight:700,color:scoreColor}}>{scoreLabel}</div>
+                        </div>
+                      </div>
+
+                      {/* Stats grid 4 colunas */}
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:8}}>
+                        {[
+                          {l:"Total publis",v:uPublis.length,c:t.accent},
+                          {l:"Este mês",v:uPubMes.length,c:"#A78BFA"},
+                          {l:"Postadas",v:uPostado,c:"#34D399"},
+                          {l:"Atrasadas",v:uAtras,c:uAtras>0?"#F87171":t.sub},
+                        ].map(s=>(
+                          <div key={s.l} style={{background:t.inputBg,borderRadius:8,padding:"8px 4px",textAlign:"center"}}>
+                            <div style={{fontSize:16,fontWeight:800,color:s.c}}>{s.v}</div>
+                            <div style={{fontSize:9,color:t.sub,marginTop:1}}>{s.l}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Faturamento */}
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
+                        {[
+                          {l:"Faturamento total",v:`R$ ${uFat.toFixed(0)}`,c:"#34D399"},
+                          {l:"Faturamento mês",v:`R$ ${uFatMes.toFixed(0)}`,c:"#34D399"},
+                          {l:"Sacado total",v:`R$ ${uSacado.toFixed(0)}`,c:"#FBBF24"},
+                          {l:"Indicações",v:uRefs,c:t.accent},
+                        ].map(s=>(
+                          <div key={s.l} style={{background:t.inputBg,borderRadius:8,padding:"8px 10px"}}>
+                            <div style={{fontSize:9,color:t.sub,marginBottom:2}}>{s.l.toUpperCase()}</div>
+                            <div style={{fontSize:13,fontWeight:800,color:s.c}}>{s.v}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Tipos de publi */}
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:8}}>
+                        {[
+                          {l:"Pagas",v:uPago,c:"#34D399"},
+                          {l:"Permuta",v:uPerm,c:"#FBBF24"},
+                          {l:"Campanhas",v:uCamp,c:"#A78BFA"},
+                          {l:"Seguidores",v:(u.followers||0).toLocaleString("pt-BR"),c:t.accent},
+                        ].map(s=>(
+                          <div key={s.l} style={{background:t.inputBg,borderRadius:8,padding:"8px 4px",textAlign:"center"}}>
+                            <div style={{fontSize:14,fontWeight:800,color:s.c}}>{s.v}</div>
+                            <div style={{fontSize:9,color:t.sub,marginTop:1}}>{s.l}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Última publi + plano */}
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
+                        <div style={{background:t.inputBg,borderRadius:8,padding:"8px 10px"}}>
+                          <div style={{fontSize:9,color:t.sub,marginBottom:2}}>ÚLTIMA PUBLI</div>
+                          <div style={{fontSize:12,fontWeight:700,color:t.text}}>{lastPub||"Nenhuma"}</div>
+                        </div>
+                        <div style={{background:t.inputBg,borderRadius:8,padding:"8px 10px"}}>
+                          <div style={{fontSize:9,color:t.sub,marginBottom:2}}>REFERIDO POR</div>
+                          <div style={{fontSize:12,fontWeight:700,color:t.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.referredBy?users.find(x=>x.id===u.referredBy)?.name||"—":"—"}</div>
+                        </div>
+                      </div>
+
+                      {/* Oportunidade de vendas */}
+                      {(()=>{
+                        let opp = null;
+                        if(u.plan!=="premium" && uPublis.length>=3)
+                          opp = {msg:"🎯 Candidato a Premium",desc:`Tem ${uPublis.length} publis — ofereça o plano Premium`,color:"#7C6AF7"};
+                        else if(u.plan!=="premium" && uRefs>=2)
+                          opp = {msg:"💡 Ativo em indicações",desc:`${uRefs} indicações — destaque o Marketplace`,color:"#EC4899"};
+                        else if(u.plan==="premium" && uAtras>=2)
+                          opp = {msg:"⚠️ Usuário com atrasos",desc:"Pode precisar de suporte para continuar ativo",color:"#F87171"};
+                        else if(u.plan==="premium" && uFatMes===0 && uPubMes.length===0)
+                          opp = {msg:"😴 Premium inativo",desc:"Sem publis este mês — risco de cancelar plano",color:"#FBBF24"};
+                        else if(u.plan==="premium" && score>=70)
+                          opp = {msg:"⭐ Usuário engajado",desc:"Ótimo para pedir depoimento ou indicação",color:"#34D399"};
+
+                        if(!opp) return null;
+                        return (
+                          <div style={{background:`${opp.color}12`,border:`1px solid ${opp.color}35`,borderRadius:10,padding:"9px 13px"}}>
+                            <div style={{fontSize:12,fontWeight:800,color:opp.color,marginBottom:3}}>{opp.msg}</div>
+                            <div style={{fontSize:11,color:t.sub}}>{opp.desc}</div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  );
+                })()}
+
+                {/* Stats originais simplificados */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10,marginTop:8}}>
                   {[
                     {label:"Seguidores",   val:(u.followers||0).toLocaleString("pt-BR")},
                     {label:"Indicações",   val:referrals.filter(r=>r.referrerId===u.id||r.referrerId===u.uid).length},
                     {label:"Ref. ID",      val:u.referralId||"—"},
-                    {label:"Referido por", val:u.referredBy?users.find(x=>x.id===u.referredBy)?.name||"—":"—"},
+                    {label:"Membro desde", val:u.joinDate||"—"},
                   ].map(s=>(
                     <div key={s.label} style={{background:t.inputBg,borderRadius:8,padding:"8px 10px"}}>
                       <div style={{fontSize:9,color:t.sub,marginBottom:2}}>{s.label.toUpperCase()}</div>
