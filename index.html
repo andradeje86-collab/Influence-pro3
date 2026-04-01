@@ -52,6 +52,8 @@
 
   window.FB_DB   = db;
   window.FB_AUTH = auth;
+
+  // Firebase helpers usando API compat
   window.fbGet = (col,id) =>
     db.collection(col).doc(id).get()
       .then(d => d.exists ? {id:d.id,...d.data()} : null);
@@ -93,6 +95,8 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script type="text/babel" data-presets="react">
   const { useState, useEffect, useCallback } = React;
+
+  // Firebase helpers (via window globals)
   const fsGet       = (c,i)     => window.fbGet(c,i);
   const fsSet       = (c,i,d)   => window.fbSet(c,i,d);
   const fsAdd       = (c,d)     => window.fbAdd(c,d);
@@ -107,6 +111,9 @@
   const fbSignUp  = (e,p) => window.fbSignUp(e,p);
   const fbSignOut = ()    => window.fbSignOut();
   const fbOnAuth  = (cb)  => window.fbOnAuth(cb);
+
+
+
 
 /* ─── CONSTANTS ─── */
 const PIX_KEY_OWNER = "2d970c88-833f-441d-bbe1-a0777afaa629";
@@ -130,15 +137,14 @@ function genRefId(n) { return n.replace(/\s.*/,"").toUpperCase().substr(0,3)+Mat
 
 /* ─── THEMES ─── */
 const THEMES = {
-  dark:  { bg:"#0D0D14",surface:"#14141F",border:"#1E1E30",text:"#E8E6F0",sub:"#6B6880",accent:"#7C6AF7",accentSoft:"#7C6AF718",card:"#16162280",navBg:"linear-gradient(180deg,#0D0D14 90%,transparent)",inputBg:"#1E1E30",inputBorder:"#2A2A40" },
-  light: { bg:"#F0EEF9",surface:"#FFFFFF",border:"#E2DFF0",text:"#1A1830",sub:"#8A88A0",accent:"#7C6AF7",accentSoft:"#7C6AF712",card:"#FFFFFFCC",navBg:"linear-gradient(180deg,#F0EEF9 90%,transparent)",inputBg:"#F5F3FF",inputBorder:"#DDD9F0" },
+  dark:  { bg:"#0D0D14",surface:"#14141F",border:"#1E1E30",text:"#E8E6F0",sub:"#6B6880",accent:"#7C6AF7",accentSoft:"#7C6AF718",card:"#16162280",navBg:"linear-gradient(180deg,#0D0D14 90%,transparent)",inputBg:"#1E1E30",inputBorder:"#2A2A40",grad:null },
+  light: { bg:"#F0EEF9",surface:"#FFFFFF",border:"#E2DFF0",text:"#1A1830",sub:"#8A88A0",accent:"#7C6AF7",accentSoft:"#7C6AF712",card:"#FFFFFFCC",navBg:"linear-gradient(180deg,#F0EEF9 90%,transparent)",inputBg:"#F5F3FF",inputBorder:"#DDD9F0",grad:null },
   insta: { bg:"#000000",surface:"#121212",border:"#262626",text:"#F5F5F5",sub:"#737373",accent:"#E1306C",accentSoft:"#E1306C18",card:"#18181880",navBg:"linear-gradient(180deg,#000000 90%,transparent)",inputBg:"#1C1C1C",inputBorder:"#363636",grad:"linear-gradient(45deg,#F58529,#DD2A7B,#8134AF,#515BD4)" },
 };
 
 const makeCSS = t => `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Bebas+Neue&display=swap');
   *{box-sizing:border-box;margin:0;padding:0;}
-
   ::-webkit-scrollbar{width:0;}
   html,body{height:100%;overflow:hidden;}
   #root{height:100vh;overflow:hidden;}
@@ -199,7 +205,7 @@ const PBtn = ({onClick,children,color,style,t,disabled}) =>
 
 const Loading = ({t}) => (
   <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:t.bg,gap:16}}>
-    <div style={{fontFamily:"'Bebas Neue'",fontSize:42,letterSpacing:4,background:`linear-gradient(135deg,${t.accent},#EC4899)` },WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",background:t.grad||`linear-gradient(135deg,${t.accent},#EC4899)`}}>INFLUENCE PRO</div>
+    <div style={{fontFamily:"'Bebas Neue'",fontSize:42,letterSpacing:4,background:`linear-gradient(135deg,${t.accent},#EC4899)`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>INFLUENCE PRO</div>
     <div style={{width:40,height:40,border:`3px solid ${t.border}`,borderTop:`3px solid ${t.accent}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
     <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
   </div>
@@ -234,9 +240,11 @@ function LoginScreen({onLogin,onGoRegister,t,themeToggle,theme}) {
         onLogin({isAdmin:true,name:"Administrador",avatar:"AD",uid:"admin"});
         return;
       }
+      // Busca usuário por username no Firestore
       const users = await fsQuery("users","username",username.trim().toLowerCase());
       if(!users.length){setErr("Usuário não encontrado.");setLoading(false);return;}
       const user = users[0];
+      // Login no Firebase Auth com email gerado
       await fbSignIn(user.email, pass);
       onLogin(user);
     } catch(e) {
@@ -256,7 +264,7 @@ function LoginScreen({onLogin,onGoRegister,t,themeToggle,theme}) {
   return (
     <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",padding:"32px 24px",background:t.bg}}>
       <style>{makeCSS(t)}</style>
-      {t.grad&&<div style={{height:3,background:t.grad,position:"sticky",top:0,zIndex:100,flexShrink:0}}/>}
+      {t.grad?<div style={{height:3,background:t.grad,position:"sticky",top:0,zIndex:100,flexShrink:0}}/>:null}
       <div style={{position:"absolute",top:20,right:20}}>
         <button onClick={themeToggle} className="s" style={{background:t.surface,border:`1px solid ${t.border}`,borderRadius:10,padding:"6px 12px",color:t.sub,cursor:"pointer",fontSize:16}}>{theme==="dark"?"☀️":theme==="light"?"📷":"🌙"}</button>
       </div>
@@ -283,7 +291,8 @@ function LoginScreen({onLogin,onGoRegister,t,themeToggle,theme}) {
 
 /* ─── REGISTER ─── */
 function RegisterScreen({onBack,onRegister,t}) {
-
+  // Captura código de indicação da URL automaticamente
+  // Capture ref from URL (?ref=CODE) - works on GitHub Pages
   const urlParams = new URLSearchParams(window.location.search);
   const hashParams = new URLSearchParams(window.location.hash.replace('#',''));
   const urlRef = urlParams.get('ref') || hashParams.get('ref') || '';
@@ -300,12 +309,14 @@ function RegisterScreen({onBack,onRegister,t}) {
   const next = async () => {
     if(step===1){
       if(!name.trim()||!username.trim()||!email.trim()||pass.length<6){setErr("Preencha todos os campos (senha mín. 6 caracteres).");return;}
-
+      // Checar username único
+      // Try username check (may need Firestore index)
       try {
         const existing = await fsQuery("users","username",username.trim().toLowerCase());
         if(existing.length){setErr("Usuário já existe. Escolha outro.");return;}
       } catch(indexErr) {
         console.warn("Username check skipped:", indexErr.message);
+        // Continue without check if index not ready
       }
       setErr(""); setStep(2);
     } else {
@@ -315,11 +326,15 @@ function RegisterScreen({onBack,onRegister,t}) {
         const cred = await fbSignUp(email.trim(), pass);
         const uid  = cred.user.uid;
         const refId = genRefId(name);
+
+        // 2. Calcular upline para rede de indicação
         let referredBy = null;
         if(refCode.trim()){
           const refs = await fsQuery("users","referralId",refCode.trim().toUpperCase());
           if(refs.length) referredBy = refs[0].id;
         }
+
+        // 3. Salvar perfil no Firestore
         const newUser = {
           uid, email:email.trim(),
           name:name.trim(),
@@ -334,6 +349,8 @@ function RegisterScreen({onBack,onRegister,t}) {
           role:"user",
         };
         await fsSet("users", uid, newUser);
+
+        // 4. Registrar na rede do referrer (níveis 1, 2, 3)
         if(referredBy){
           const commission = plan==="premium"?1.00:0;
           await fsAdd("referrals",{
@@ -362,6 +379,8 @@ function RegisterScreen({onBack,onRegister,t}) {
             }
           }
         }
+
+        // If selected premium, show notice
         if(plan==="premium"){
           alert("Conta criada! ✅\n\nVocê selecionou o plano Premium.\nPague R$ 10,00 via PIX: 2d970c88-833f-441d-bbe1-a0777afaa629\n\nApós o pagamento, o admin ativará seu Premium em até 24h.");
         }
@@ -389,7 +408,7 @@ function RegisterScreen({onBack,onRegister,t}) {
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:32}}>
         <button onClick={step>1?()=>{setErr("");setStep(1);}:onBack} style={{background:t.surface,border:`1px solid ${t.border}`,color:t.sub,borderRadius:10,width:36,height:36,cursor:"pointer",fontSize:18}}>←</button>
         <div>
-          <div style={{fontFamily:"'Bebas Neue'",fontSize:22,letterSpacing:3,background:`linear-gradient(135deg,${t.accent},#EC4899)` },WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",background:t.grad||`linear-gradient(135deg,${t.accent},#EC4899)`}}>INFLUENCE PRO</div>
+          <div style={{fontFamily:"'Bebas Neue'",fontSize:22,letterSpacing:3,background:`linear-gradient(135deg,${t.accent},#EC4899)`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>INFLUENCE PRO</div>
           <div style={{fontSize:11,color:t.sub}}>Criar conta</div>
         </div>
       </div>
@@ -529,6 +548,7 @@ function PubliModal({onClose,onSave,onDelete,isPremium,currentCount,initial,t}) 
     </Modal>
   );
 }
+
 
 /* ─── CAMPANHA MODAL ─── */
 function CampanhaModal({onClose,onSave,initial,t}) {
@@ -694,8 +714,8 @@ function MainApp({user,t,themeToggle,theme,onLogout}) {
   const [showNew,setShowNew]     = useState(false);
   const [editingPubli,setEditingPubli] = useState(null);
   const [showWith,setShowWith]   = useState(false);
-  const [goldSaldo,setGoldSaldo] = useState(0);
-  const [lastCheckin,setLastCheckin] = useState(null);
+  const [goldSaldo,setGoldSaldo]       = useState(0);
+  const [lastCheckin,setLastCheckin]   = useState(null);
   const [checkinStreak,setCheckinStreak] = useState(0);
   const [showPlans,setShowPlans] = useState(false);
   const [pixCopied,setPixCopied]   = useState(false);
@@ -715,11 +735,14 @@ function MainApp({user,t,themeToggle,theme,onLogout}) {
   const [fixResult,setFixResult]     = useState("");
 
   const uid = user.id || user.uid;
+  // Debug: garantir que withdrawals está carregando
   useEffect(()=>{
     if(withdrawals.length>0){
       console.log("Withdrawals carregados:", withdrawals.length, withdrawals.map(w=>({id:w.id,status:w.status,amount:w.amount})));
     }
   },[withdrawals]);
+
+  // ── Realtime listeners ──
   useEffect(() => {
     if(!uid) return;
     setLoadingData(true);
@@ -729,22 +752,20 @@ function MainApp({user,t,themeToggle,theme,onLogout}) {
     unsubs.push(fsListen("publis","userId",uid, data => setPublis(data)));
     // Checklist
     unsubs.push(fsListen("checklist","userId",uid, data => setChecklist(data)));
+    // Withdrawals — tenta pelos dois campos possíveis
     unsubs.push(fsListen("withdrawals","userId",uid, data => {
       setWithdrawals(prev => {
+        // Merge: mantém registros de outros campos e adiciona os novos
         const ids = new Set(data.map(d=>d.id));
         const others = prev.filter(p=>!ids.has(p.id));
         return [...data, ...others.filter(o=>o.userId===uid||o.uid===uid)];
       });
     }));
+    // Referrals desta pessoa
     unsubs.push(fsListen("referrals","referrerId",uid, data => setReferrals(data)));
 
-    fsGet("goals", uid+"_gold").then(d => {
-      if(d) {
-        setGoldSaldo(d.saldo||0);
-        setLastCheckin(d.lastCheckin||null);
-        setCheckinStreak(d.streak||0);
-      }
-    }).catch(()=>{});
+    // Goals (documento único por usuário)
+    fsGet("goals",uid+"_gold").then(d=>{if(d){setGoldSaldo(d.saldo||0);setLastCheckin(d.lastCheckin||null);setCheckinStreak(d.streak||0);}}).catch(()=>{});
     fsGet("goals", uid).then(d => {
       if(d?.items) setGoals(d.items);
       else setGoals([
@@ -754,6 +775,8 @@ function MainApp({user,t,themeToggle,theme,onLogout}) {
         {id:4,title:"Engajamento",current:0,target:6.0,unit:"%",icon:"🔥"},
       ]);
     });
+
+    // Upline (quem indicou este usuário)
     if(user.referredBy){
       fsGet("users", user.referredBy).then(u => setUpline(u));
     }
@@ -776,6 +799,7 @@ function MainApp({user,t,themeToggle,theme,onLogout}) {
   const isPrem   = user.plan==="premium" && (!user.planExpiry || user.planExpiry >= today2);
   const baseUrl  = window.location.origin + window.location.pathname;
   const refLink  = `${baseUrl}?ref=${user.referralId}`;
+  // Also support hash-based ref for GitHub Pages
   const refLinkFull = refLink;
   const filtered = publis.filter(p=>(filterT==="todos"||p.type===filterT)&&(filterP==="todos"||p.payment===filterP));
   const lvl1     = referrals.filter(r=>r.level===1);
@@ -980,6 +1004,7 @@ function MainApp({user,t,themeToggle,theme,onLogout}) {
             {filtered.length===0&&<div style={{textAlign:"center",padding:32,color:t.sub,fontSize:13}}>Nenhuma publi encontrada.</div>}
             {filtered.map(p=>(
               p.type==="campanha" ? (
+              // ── CARD CAMPANHA ──
               <div key={p.id} onClick={()=>setEditingCampanha(p)} className="s"
                 style={{background:t.card,border:`2px solid #A78BFA44`,borderRadius:16,padding:16,marginBottom:10,position:"relative"}}>
                 <div style={{position:"absolute",top:-10,left:16,background:"linear-gradient(135deg,#A78BFA,#7C3AED)",color:"#FFF",fontSize:9,fontWeight:800,padding:"2px 10px",borderRadius:20,letterSpacing:1}}>📦 CAMPANHA</div>
@@ -1092,6 +1117,7 @@ function MainApp({user,t,themeToggle,theme,onLogout}) {
                 })()}
               </div>
               ) : (
+              // ── CARD PUBLI NORMAL ──
               <div key={p.id} onClick={()=>setEditingPubli(p)} className="s" style={{background:t.card,border:`1px solid ${p.status==="atrasado"?"#F8717138":t.border}`,borderRadius:16,padding:16,marginBottom:10}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                   <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1396,7 +1422,9 @@ function MainApp({user,t,themeToggle,theme,onLogout}) {
           onClose={()=>{setShowNew(false);setEditingPubli(null);}}
           onDelete={async()=>{
             if(!editingPubli) return;
+            // Excluir publi do Firestore
             await fsDelete("publis", editingPubli.id);
+            // Excluir checklist vinculado (mesma marca + tipo)
             const linked = checklist.find(c=>c.brand===editingPubli.brand&&c.type===editingPubli.type&&c.date===editingPubli.delivery);
             if(linked) await fsDelete("checklist", linked.id);
             setEditingPubli(null);
@@ -1404,12 +1432,14 @@ function MainApp({user,t,themeToggle,theme,onLogout}) {
           onSave={async p=>{
             if(editingPubli){
               await fsUpdate("publis",editingPubli.id,p);
+              // Update checklist date if delivery changed
               const existing = checklist.find(c=>c.brand===p.brand&&c.type===p.type);
               if(existing && existing.date!==p.delivery){
                 await fsUpdate("checklist",existing.id,{date:p.delivery});
               }
             } else {
               await fsAdd("publis",{...p,userId:uid});
+              // Auto-create checklist entry for this publi
               await fsAdd("checklist",{
                 userId:uid,
                 brand:p.brand,
@@ -1561,98 +1591,67 @@ function MainApp({user,t,themeToggle,theme,onLogout}) {
   );
 }
 
-/* ─── CHECK-IN DIÁRIO ─── */
-function CheckInButton({uid,goldSaldo,setGoldSaldo,lastCheckin,setLastCheckin,checkinStreak,setCheckinStreak,t,fsSet}) {
-  const today  = new Date().toISOString().substr(0,10);
-  const done   = lastCheckin === today;
-  const [anim, setAnim] = useState(false);
-  const [msg, setMsg]   = useState("");
-  const SEQUENCE = [2,4,8,16,32,64,128];
-  const nextIdx  = checkinStreak % SEQUENCE.length;
-  const nextGold = SEQUENCE[nextIdx];
-  const nextIdxAfter = (nextIdx+1) % SEQUENCE.length;
 
-  const doCheckin = async () => {
-    if (done) return;
-    const newStreak = checkinStreak + 1;
-    const earned    = nextGold;
-    const newSaldo  = goldSaldo + earned;
-    setAnim(true);
-    setMsg(`+${earned} 🥇`);
-    setGoldSaldo(newSaldo);
-    setLastCheckin(today);
-    setCheckinStreak(newStreak);
-    await fsSet("goals", uid+"_gold", {
-      saldo:newSaldo, lastCheckin:today, streak:newStreak, updatedAt:today
-    });
-    setTimeout(()=>{ setAnim(false); setMsg(""); }, 2000);
+/* ─── CHECK-IN ─── */
+function CheckInButton({uid,goldSaldo,setGoldSaldo,lastCheckin,setLastCheckin,checkinStreak,setCheckinStreak,t,fsSet}){
+  const today=new Date().toISOString().substr(0,10);
+  const done=lastCheckin===today;
+  const [anim,setAnim]=useState(false);
+  const SEQ=[2,4,8,16,32,64,128];
+  const idx=checkinStreak%SEQ.length;
+  const earn=SEQ[idx];
+  const nextEarn=SEQ[(idx+1)%SEQ.length];
+  const reais=(goldSaldo/1000).toFixed(2);
+
+  const doCheck=async()=>{
+    if(done)return;
+    const ns=checkinStreak+1;
+    const nb=goldSaldo+earn;
+    setAnim(true);setGoldSaldo(nb);setLastCheckin(today);setCheckinStreak(ns);
+    await fsSet("goals",uid+"_gold",{saldo:nb,lastCheckin:today,streak:ns,updatedAt:today});
+    setTimeout(()=>setAnim(false),1800);
   };
 
-  const reaisVal=(goldSaldo/100*0.10).toFixed(2);
-
-  return (
-    <div style={{background:anim?`linear-gradient(135deg,#FBBF2422,#F59E0B22)`:`${t.accent}0A`,border:`2px solid ${done?"#34D39944":"#FBBF2455"}`,borderRadius:18,padding:16,marginBottom:14,position:"relative",overflow:"hidden"}}>
-      {/* Shine effect on check-in */}
-      {anim&&<div style={{position:"absolute",inset:0,background:"linear-gradient(135deg,#FBBF2408,#FBBF2420)",borderRadius:18,animation:"pulse 0.5s ease"}}/>}
-
-      {/* Header row */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+  const bc=done?"#34D399":"#FBBF24";
+  return(
+    <div style={{background:anim?"#FBBF2415":done?"#34D39910":"#FBBF2408",border:"2px solid "+(done?"#34D39944":"#FBBF2444"),borderRadius:18,padding:14,marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
         <div>
-          <div style={{fontSize:14,fontWeight:800,color:done?"#34D399":"#FBBF24"}}>
-            {done?"✅ Check-in feito!":"🥇 Check-in diário"}
-          </div>
-          <div style={{fontSize:11,color:t.sub,marginTop:2}}>
-            {done?`Próximo amanhã (+${SEQUENCE[nextIdxAfter]} golds)`:`Ganhe ${nextGold} golds hoje`}
-          </div>
+          <div style={{fontSize:13,fontWeight:800,color:bc}}>{done?"✅ Check-in feito!":"🥇 Check-in diário"}</div>
+          <div style={{fontSize:11,color:t.sub,marginTop:2}}>{done?"Próximo amanhã (+"+nextEarn+" golds)":"Toque para ganhar "+earn+" golds"}</div>
         </div>
         <div style={{textAlign:"right"}}>
-          <div style={{fontSize:22,fontWeight:800,color:"#FBBF24"}}>{goldSaldo} 🥇</div>
-          <div style={{fontSize:10,color:t.sub}}>= R$ {reaisVal}</div>
+          <div style={{fontSize:20,fontWeight:800,color:"#FBBF24"}}>{goldSaldo} 🥇</div>
+          <div style={{fontSize:10,color:t.sub}}>{"R$ "+reais}</div>
         </div>
       </div>
-
-      {/* Week progress */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:12}}>
-        {SEQUENCE.map((g,i)=>{
-          const isPast = i < nextIdx;
-          const isCurr = i === nextIdx;
-          const future = i > nextIdx;
-          return (
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:10}}>
+        {SEQ.map((g,i)=>{
+          const past=i<idx;const curr=i===idx;
+          return(
             <div key={i} style={{textAlign:"center"}}>
-              <div style={{height:36,width:"100%",borderRadius:8,
-                background:isPast?"#34D39930":isCurr&&done?"#34D39930":isCurr?"#FBBF2430":future?"#1A1A2E":"#1A1A2E",
-                border:`1px solid ${isPast?"#34D39960":isCurr&&done?"#34D39960":isCurr?"#FBBF2460":"#1A1A2E"}`,
-                display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>
-                {isPast?"✓":isCurr&&done?"✓":g+""}
+              <div style={{height:32,borderRadius:7,background:past?"#34D39928":curr&&done?"#34D39928":curr?"#FBBF2428":"#1A1A2E",border:"1px solid "+(past?"#34D39960":curr?"#FBBF2460":"transparent"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:past?"#34D399":curr?bc:t.sub,fontWeight:800}}>
+                {past?"✓":String(g)}
               </div>
-              <div style={{fontSize:8,color:t.sub,marginTop:3}}>🥇{g}</div>
+              <div style={{fontSize:8,color:t.sub,marginTop:2}}>{"🥇"+g}</div>
             </div>
           );
         })}
       </div>
-
-      {/* Action */}
       {!done?(
-        <button onClick={doCheckin} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#FBBF24,#F59E0B)",color:"#000",fontWeight:800,fontSize:15,cursor:"pointer",position:"relative"}}>
-          {msg||`🥇 Fazer check-in — ganhar ${nextGold} golds`}
+        <button onClick={doCheck} style={{width:"100%",padding:11,borderRadius:12,border:"none",background:"linear-gradient(135deg,#FBBF24,#F59E0B)",color:"#000",fontWeight:800,fontSize:14,cursor:"pointer"}}>
+          {"🥇 Ganhar "+earn+" golds hoje"}
         </button>
       ):(
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          <div style={{background:"#34D39910",border:"1px solid #34D39930",borderRadius:10,padding:"9px",textAlign:"center"}}>
-            <div style={{fontSize:11,color:t.sub}}>Sequência atual</div>
-            <div style={{fontSize:18,fontWeight:800,color:"#34D399"}}>🔥 {checkinStreak} dias</div>
+          <div style={{background:"#34D39910",border:"1px solid #34D39930",borderRadius:10,padding:9,textAlign:"center"}}>
+            <div style={{fontSize:11,color:t.sub}}>Sequência</div>
+            <div style={{fontSize:17,fontWeight:800,color:"#34D399"}}>{"🔥 "+checkinStreak+" dias"}</div>
           </div>
-          <div style={{background:"#FBBF2410",border:"1px solid #FBBF2430",borderRadius:10,padding:"9px",textAlign:"center"}}>
-            <div style={{fontSize:11,color:t.sub}}>Saldo em reais</div>
-            <div style={{fontSize:18,fontWeight:800,color:"#FBBF24"}}>R$ {reaisVal}</div>
+          <div style={{background:"#FBBF2410",border:"1px solid #FBBF2430",borderRadius:10,padding:9,textAlign:"center"}}>
+            <div style={{fontSize:11,color:t.sub}}>Saldo</div>
+            <div style={{fontSize:17,fontWeight:800,color:"#FBBF24"}}>{"R$ "+reais}</div>
           </div>
-        </div>
-      )}
-
-      {/* Big floating message */}
-      {msg&&(
-        <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:48,fontWeight:800,color:"#FBBF24",pointerEvents:"none",animation:"fadeUp 2s ease forwards"}}>
-          {msg}
         </div>
       )}
     </div>
@@ -1741,6 +1740,7 @@ function AdminPanel({t,themeToggle,theme,onLogout}) {
         {/* ADMIN DASHBOARD */}
         {tab==="dashboard"&&(
           <div className="fi">
+            <CheckInButton uid={uid} goldSaldo={goldSaldo} setGoldSaldo={setGoldSaldo} lastCheckin={lastCheckin} setLastCheckin={setLastCheckin} checkinStreak={checkinStreak} setCheckinStreak={setCheckinStreak} t={t} fsSet={fsSet}/>
             <div style={{fontSize:20,fontWeight:800,marginBottom:4,color:t.text}}>Dashboard</div>
             <div style={{fontSize:11,color:t.sub,marginBottom:16}}>Dados em tempo real do Firebase</div>
             {(()=>{
@@ -1925,10 +1925,10 @@ function AdminPanel({t,themeToggle,theme,onLogout}) {
             <div style={{fontSize:11,color:t.sub,marginBottom:16}}>{users.length} usuários — dados em tempo real</div>
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nome ou usuário..."
               style={{width:"100%",background:t.inputBg,border:`1px solid ${t.inputBorder}`,borderRadius:10,padding:"12px 14px",fontSize:14,color:t.text,marginBottom:16,outline:"none"}}/>
-            {(()=>{const m0=new Date().toISOString().substr(0,7);const at=users.filter(u=>publis.some(p=>p.userId===(u.id||u.uid)&&(p.delivery||"").startsWith(m0))).length;const cp=users.filter(u=>u.plan!=="premium"&&publis.filter(p=>p.userId===(u.id||u.uid)).length>=3).length;const pi=users.filter(u=>u.plan==="premium"&&!publis.some(p=>p.userId===(u.id||u.uid)&&(p.delivery||"").startsWith(m0))).length;return(<div style={{background:`${t.accent}08`,border:`1px solid ${t.accent}22`,borderRadius:14,padding:12,marginBottom:12}}><div style={{fontSize:10,fontWeight:800,color:t.accent,letterSpacing:1,marginBottom:8}}>📊 PLANO DE VENDAS</div><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>{[{l:"Ativos/mês",v:at,c:"#34D399"},{l:"→ Premium",v:cp,c:t.accent},{l:"Inativos",v:pi,c:"#F87171"}].map(s=>(<div key={s.l} style={{background:`${s.c}0C`,border:`1px solid ${s.c}28`,borderRadius:10,padding:"9px 4px",textAlign:"center"}}><div style={{fontSize:20,fontWeight:800,color:s.c}}>{s.v}</div><div style={{fontSize:9,color:t.sub,marginTop:1}}>{s.l}</div></div>))}</div></div>);})()}
+            {(()=>{const m0=new Date().toISOString().substr(0,7);const at=users.filter(u=>publis.some(p=>p.userId===(u.id||u.uid)&&(p.delivery||"").startsWith(m0))).length;const cp=users.filter(u=>u.plan!=="premium"&&publis.filter(p=>p.userId===(u.id||u.uid)).length>=3).length;const pi=users.filter(u=>u.plan==="premium"&&!publis.some(p=>p.userId===(u.id||u.uid)&&(p.delivery||"").startsWith(m0))).length;return(<div style={{background:t.accentSoft,border:"1px solid "+t.accent+"33",borderRadius:14,padding:12,marginBottom:12}}><div style={{fontSize:10,fontWeight:800,color:t.accent,letterSpacing:1,marginBottom:8}}>📊 PLANO DE VENDAS</div><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>{[{l:"Ativos/mês",v:at,c:"#34D399"},{l:"→ Premium",v:cp,c:t.accent},{l:"Inativos",v:pi,c:"#F87171"}].map(s=>(<div key={s.l} style={{background:s.c+"0C",border:"1px solid "+s.c+"28",borderRadius:10,padding:"9px 4px",textAlign:"center"}}><div style={{fontSize:20,fontWeight:800,color:s.c}}>{s.v}</div><div style={{fontSize:9,color:t.sub,marginTop:1}}>{s.l}</div></div>))}</div></div>);})()}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
               {[{label:"Total",val:users.length,color:t.accent},{label:"Premium",val:premium.length,color:"#34D399"},{label:"Free",val:freeUsers.length,color:"#FBBF24"}].map(s=>(
-                <div key={s.label} style={{background:`${s.color}0C`,border:`1px solid ${s.color}28`,borderRadius:12,padding:12,textAlign:"center"}}>
+                <div key={s.label} style={{background:s.color+"0C",border:"1px solid "+s.color+"28",borderRadius:12,padding:12,textAlign:"center"}}>
                   <div style={{fontSize:24,fontWeight:800,color:s.color}}>{s.val}</div>
                   <div style={{fontSize:10,color:t.sub}}>{s.label}</div>
                 </div>
@@ -1945,7 +1945,7 @@ function AdminPanel({t,themeToggle,theme,onLogout}) {
                   </div>
                   <Pill label={u.plan==="premium"?"✦ Premium":"Free"} color={u.plan==="premium"?t.accent:"#6B7280"}/>
                 </div>
-                {(()=>{const uid0=u.id||u.uid;const uP=publis.filter(p=>p.userId===uid0);const m1=new Date().toISOString().substr(0,7);const uPm=uP.filter(p=>(p.delivery||"").startsWith(m1)).length;const uF=uP.filter(p=>p.payment==="pago").reduce((a,b)=>a+(b.value||0),0);const uA=uP.filter(p=>p.status==="atrasado").length;const uR=referrals.filter(r=>r.referrerId===uid0).length;const sc2=Math.min(100,Math.round(uP.length*3+uP.filter(p=>p.status==="postado").length*2+uF/50+uR*5-uA*4));const sc3=sc2>=70?"#34D399":sc2>=40?"#FBBF24":"#F87171";const opp=u.plan!=="premium"&&uP.length>=3?"🎯 Candidato Premium":u.plan==="premium"&&uPm===0?"😴 Inativo":u.plan==="premium"&&uA>=2?"⚠️ Atrasos":sc2>=70?"⭐ Muito ativo":null;return(<div><div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:5,marginBottom:6}}>{[{l:"Publis",v:uP.length,c:t.accent},{l:"Mês",v:uPm,c:"#A78BFA"},{l:`R$${uF.toFixed(0)}`,v:"fat",c:"#34D399"},{l:"Score",v:sc2,c:sc3}].map(s=>(<div key={s.l} style={{background:t.inputBg,borderRadius:8,padding:"7px 4px",textAlign:"center"}}><div style={{fontSize:15,fontWeight:800,color:s.c}}>{s.v==="fat"?s.l:s.v}</div><div style={{fontSize:9,color:t.sub,marginTop:1}}>{s.v==="fat"?"Faturou":s.l}</div></div>))}</div>{opp&&<div style={{background:`${sc3}12`,border:`1px solid ${sc3}35`,borderRadius:8,padding:"7px 11px",marginBottom:6,fontSize:11,fontWeight:700,color:sc3}}>{opp}</div>}</div>);})()}
+                {(()=>{const uid0=u.id||u.uid;const uP=publis.filter(p=>p.userId===uid0);const m1=new Date().toISOString().substr(0,7);const uPm=uP.filter(p=>(p.delivery||"").startsWith(m1)).length;const uF=uP.filter(p=>p.payment==="pago").reduce((a,b)=>a+(b.value||0),0);const uA=uP.filter(p=>p.status==="atrasado").length;const uR=referrals.filter(r=>r.referrerId===uid0).length;const sc=Math.min(100,Math.round(uP.length*3+uP.filter(p=>p.status==="postado").length*2+uF/50+uR*5-uA*4));const cc=sc>=70?"#34D399":sc>=40?"#FBBF24":"#F87171";const opp=u.plan!=="premium"&&uP.length>=3?"🎯 Candidato Premium":u.plan==="premium"&&uPm===0?"😴 Inativo":u.plan==="premium"&&uA>=2?"⚠️ Atrasos":sc>=70?"⭐ Muito ativo":null;return(<div><div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:5,marginBottom:6}}>{[{l:"Publis",v:uP.length,c:t.accent},{l:"Mês",v:uPm,c:"#A78BFA"},{l:"Faturou",v:"R$"+uF.toFixed(0),c:"#34D399"},{l:"Score",v:sc,c:cc}].map(s=>(<div key={s.l} style={{background:t.inputBg,borderRadius:8,padding:"7px 4px",textAlign:"center"}}><div style={{fontSize:15,fontWeight:800,color:s.c}}>{s.v}</div><div style={{fontSize:9,color:t.sub,marginTop:1}}>{s.l}</div></div>))}</div>{opp&&<div style={{background:cc+"12",border:"1px solid "+cc+"35",borderRadius:8,padding:"7px 11px",marginBottom:6,fontSize:11,fontWeight:700,color:cc}}>{opp}</div>}</div>);})()}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
                   {[
                     {label:"Seguidores",   val:(u.followers||0).toLocaleString("pt-BR")},
@@ -2088,8 +2088,11 @@ function AdminPanel({t,themeToggle,theme,onLogout}) {
                 let errors = 0;
                 try {
                   for(const w of withdrawals){
+                    // Já tem userId válido que bate com algum usuário?
                     const matchDirect = users.find(u=>(u.id===w.userId||u.uid===w.userId));
                     if(matchDirect) continue; // OK, pula
+
+                    // Tentar achar pelo pixKey
                     let foundUser = null;
                     if(w.pixKey){
                       foundUser = users.find(u=>
@@ -2098,6 +2101,7 @@ function AdminPanel({t,themeToggle,theme,onLogout}) {
                         u.cpf===w.pixKey
                       );
                     }
+                    // Tentar achar pelo username no userId
                     if(!foundUser && w.userId){
                       foundUser = users.find(u=>
                         u.username===w.userId ||
@@ -2182,7 +2186,9 @@ function AdminPanel({t,themeToggle,theme,onLogout}) {
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <button onClick={async()=>{
                         if(w.status==="aguardando"){
+                          // Marcar como pago e registrar data
                           await fsUpdate("withdrawals",w.id,{status:"pago",paidAt:new Date().toISOString().substr(0,10)});
+                          // Atualizar totalEarnings do usuário para refletir débito
                           const userDoc = users.find(x=>x.id===w.userId||x.uid===w.userId);
                           if(userDoc){
                             const uid2 = userDoc.id||userDoc.uid;
@@ -2221,7 +2227,10 @@ function InfluencePRO() {
   const t      = THEMES[theme];
   const toggle = () => setTheme(th=>{ const nv=th==="dark"?"light":th==="light"?"insta":"dark"; try{localStorage.setItem("ip_theme",nv);}catch(e){} return nv; });
   const today  = new Date().toISOString().substr(0,10);
+
+  // Persiste sessão Firebase Auth + Admin via localStorage
   useEffect(()=>{
+    // Check admin session first
     try {
       const adminSession = localStorage.getItem("ip_admin_session");
       if(adminSession === "true"){
@@ -2237,6 +2246,7 @@ function InfluencePRO() {
           const profile = await fsGet("users", fbUser.uid);
           if(profile){
             setUser(profile);
+            // Save theme preference
             try{ const th=localStorage.getItem("ip_theme"); if(th) setTheme(th); }catch(e){}
             setScreen("app");
           } else {
